@@ -1,0 +1,218 @@
+---
+title: "ProjectHours"
+author: "Andrew Cameron"
+date: "2024-01-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Consider that a) you are delivering high quality products that are designed for replicability and ease of us. Thoughtfully annotated, broken into digestible, discrete chunks, easy to navigate, readme documentation. Custom functions deployed to reduce code-clutter and make it easier to modify variables, plots, tables; axis titles, labels, plot titles, table captions, etc are dynamically referenced to minimize the amount of manual code modification that is required from year to year.
+# and b) you are doing this for well under 'market rate' for a skilled coder. (but, could anyone do this now, in the age of ChatGPT?)
+
+```
+
+
+## pay period 1 
+
+#### Dec 29 - Jan 7
+
+12/29 - 10-11; 13-14:30; 18-20:30 (5)
+
+12/30 - 8:30-9:30 (1)
+
+1/3 8:45-9:15; 12:45-13:45pm; 19:30-20 (2)
+
+1/6 6:45-7:45 (1)
+
+1/7 15:30-16:30 (1)
+
+```         
+    - Modified code to ehance replicability by dynamically referencing the number of years included in the data
+    - New variables included in yearly statistics table
+    - Ran new model with T:TtoCond as predictor; formatted tables and plots
+    - Improvements to code (distinguish duplicate variables in global environment, e.g., `model` differentiated into `model_tq`, `model_tq_avg`, and `model_tcond`)
+    - Generated residuals time series plots
+    - Improved consistency in axes label
+    - Debugging
+    - Fixed data error (10/18/16; CHLa for B107 corrected to 13.96 from 1.03)
+    - Summary statistics derived only for Jul-Oct index period, rather than entire year (slightly trickier for discharge given the data structure)
+    - Combined tables as requested (summary stats + CHLa 90th perc.; bloom, N-depleted, and low flow) and derived all values only for jul-oct index period
+    - Added y = 0 line ro residuals plots
+    - Box-whisker plots for residuals of T:Q (model1)
+    - Research for tangential model; fitting models; unpacking results; visualizing output; refining and editing code to ensure data integrity
+```
+
+<br>
+
+#### Week of Jan 8
+
+1/10 19:00-19:20 (.33)
+
+1/11 5:40-6:20; 6:30-7:15 (1.42)
+
+1/12 9:00-10:00 (1.5)
+
+```         
+ -  Derived mean discharge values by year during jul-oct on CHLa sampling days *only*
+ -  Code organizing and streamlining; improved annotation.
+ -  Named chunks and improved document navegability
+ -  Plotting obs vs predicted by year for tangential model.
+ -  Reviewed relevant code to identify possible issues there that might account for neg CHLamax vals
+```
+
+<br>
+
+#### Week of Jan 15
+
+1/14 - 19-20:00 (1)
+
+1/15 - 9:15-11:15 (2); 17-17:30 (.5)
+
+1/16 - 6:00-8:30 (2.5)
+
+1/18 - 12:30-17:15 (4.75); 19-21:00 (2)
+
+1/19 - 20:15-21:45 (1.5)
+
+1/20 - 8:00-11:30 (3.5)
+
+```         
+-  Revised year by year plots for nonlinear modeal, as requested
+-  Created custom functions to incorporate into script to clean up main program and make more readable, shorter, and reliable. 
+-  Research into gganimate functionality and usage; making test plots; Careful review of: packlage documentation, functions, syntax, grammar; vignettes; code examples and output. 
+- Organized, debugged, streamlined, annotated, and prepared code for delivery. 
+- Refined plot labels, axes, titles
+- Improved functionality of custom functions.
+- Prepared README.rmd file
+```
+
+<br>
+
+#### Week of Jan 22
+
+1/24 - 17-20:00 (3.5)
+
+1/25 - 16-18:00; 21:10-21:45 (2.5)
+1/27 - 8-9:30 (1.5)
+```
+
+  - Experimental implemntation of code; 
+  - extensive trial and error (additional time animating/rednering); 
+  - code writing and re-writing; 
+  - additional reading to find answers to questions and to help resolve issues as they arise.
+  - data preparation for 2021 mean recalculation (resolve date issue in R)
+  - updating plot data
+  - data verification 
+
+```
+
+## begin pay period 2
+
+#### Week of Jan 29
+
+1/29 - 3:00-3:15 (.25); 16:30-19:00 (2.5); 8:30-9:15 (.75)
+
+1/30 - 8:30-9:30 (1)
+
+1/31 - 14:30-17:30 (3)
+
+2/1 - 17:00-18:30; 20:15 -11:15 (4.5)
+
+```
+ - recalculated 2020 summary statistics and plotted against the original data.
+ - read all data from 2009-2022 into R. Time consuming to identify and resolve the various data type dicrepancies from year to year; identify which tabs had metadata in the first row (i.e., units)
+ - 2016, 2017, 2019 caused some headache because of one or more tabs with key columns that had different naming convention than the other tabs.
+ - considerable work to get data into a position to be summarized.
+    -   setting variable names across tabs
+    -   writing functions to facilitate data validation and 
+
+ ```
+ 
+#### Week of Feb 5
+
+2/5 - 8:00-9:15 (1.25)
+
+2/6 - 22:00-23:30 (1.5)
+
+2/8 - 14:30-17:45 (3.25)
+
+2/9 - 17:30-20:00 (4)
+
+```
+   - considerable time into modifying plot to achieve desired appearance and animation
+   - recalculating updated summary statistics
+```
+
+#### Week of Feb 12
+
+2/14 - 17:30-18:30 (1.5)
+
+2/16 - 19:15-21:15 (2)
+
+2/17 - 8:10-9:40 (1.5), 11:00-11:30 (.5)
+
+#### Week of Feb 19
+
+2/19 - 16:00-17:20
+
+2/20 - 10:45-11:45
+
+
+```{r, echo=FALSE, include=FALSE}
+ 
+weekly_hrs <- sum(m = 1.3,
+                  t = 1 ,
+                  w = 0,
+                  r = 0,
+                  f = 0,
+                  s = 0,
+                  su = 0)
+print(weekly_hrs)
+paste0("$", weekly_hrs * 30)
+
+```
+
+
+## update billable hours csv
+
+```{r `update hrs func` echo=FALSE, include=FALSE}
+
+# function to update weekly hours csv
+update_hours <- function(period, end.date, hours, comments) {
+    # define relevant vars
+      dir = "~/Desktop/WaterQuality/"
+      filenames = list.files("~/Desktop/WaterQuality/")
+      index = which(grepl("Cameron_hours.csv", filenames))
+      csv_path <- paste0(dir, filenames[index])
+      
+    # read in most recent hrs csva and bind current week object
+      csv <- readr::read_csv(csv_path)
+      weeklyhrs <-  data.frame(period = period,
+                               end.date = as.Date(end.date),
+                               hours = hours,
+                               comments = comments)
+      updated_hrs <- rbind(csv, weeklyhrs)
+      
+    # rename original csv to differentiate and preserve a copy  
+      file.rename(csv_path, paste0(dir, "Cameron_hours_previous.csv"))
+      
+      readr::write_csv(updated_hrs, csv_path)
+}
+
+```
+
+```{r}
+# --- define pay period parameters ---  
+
+    period = "Feb 19 - Feb 25"
+    end.date = "2024-02-18"
+    hours = 5.5
+    comments = ""
+
+# ----------------------------------
+    
+      update_hours(period, end.date, hours, comments)
+
+```

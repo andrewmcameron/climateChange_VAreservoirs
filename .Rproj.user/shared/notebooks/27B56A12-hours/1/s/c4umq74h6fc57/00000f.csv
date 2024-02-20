@@ -1,0 +1,18 @@
+"0","# --- define pay period parameters ---  "
+"0",""
+"0","    period = ""Feb 12 - Feb 18"""
+"0","    end.date = ""2024-02-18"""
+"0","    hours = 5.5"
+"0","    comments = """""
+"0",""
+"0","# ----------------------------------"
+"0","    "
+"0","      update_hours(period, end.date, hours, comments)"
+"2","[1mRows: [22m[34m7[39m [1mColumns: [22m[34m4[39m"
+"2","[36m──[39m [1mColumn specification[22m [36m─────────────────────────────────────[39m
+[1mDelimiter:[22m "",""
+[31mchr[39m (3): period, end.date, comments
+[32mdbl[39m (1): hours"
+"2","
+[36mℹ[39m Use `spec()` to retrieve the full column specification for this data.
+[36mℹ[39m Specify the column types or set `show_col_types = FALSE` to quiet this message."

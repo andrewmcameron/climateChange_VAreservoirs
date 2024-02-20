@@ -1,0 +1,133 @@
+---
+title: "Project Notes"
+author: "Andrew Cameron"
+date: "2023-12-29"
+output: 
+  html_document:
+    toc: TRUE
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#git remote add origin <"https://github.com/ebin40ozdj/algal_blooms">
+
+```
+
+## Proejct: Chlorophyll A Modelling
+
+Index period: Jul-Oct (2010-2023)
+
+Program overview:
+
+-   Generate yearly summary statistics (e.g., mean CHLa, bloom days, etc.) using iNDEX PERIOD data only (Jul-Oct)
+
+-   Model Chlorophyll A (CHLa) concentration as function of water quality parameters.
+
+    linear modelling: $ln(CHLa)$ \~ $ln(x)$, where ln achieved using `log()` function, which defaults to natural logarithm. Throughout document, axes and titles should technically read as ln(variable) and NOT log(variable), the latter of which suggests base 10 in common notation.
+
+    nonlinear model: Tangential model that solves for two coefficients
+
+-   Examine residuals using time series and box-whisker plots.
+
+-   plot CHLA \~ T:Q for 2010-2023 and for each year individually for each model, including best fit line.
+
+-   generate aninmations using `gganimate`
+
+<br>
+
+#### 28 Dec 2023
+
+##### Specific conductance as predictor
+
+3 new variables to the Excel input file: Specific Conductance `SpCond`, the inverse of SpCond `InvpCond`, and the ratio of water Temp to InvSpCond `TtoCond`.
+
+**Objective:** Re-run the CHLa model by substituting the ratio of Temp:InvSpCond for Temp:Q.
+
+SpCond is a measure of dissolved substances in water (which affects the ability of water to carry a charge). In the estuary, conductance declines following rain effects (inflow of dilute river water) and increases during periods of drought (less freshwater to dilute gradual gain in salinity from tidal exchange). We would expect that discharge and conductivity would be correlated, but *conductivity has the benefit that it is less flashy and changes more gradually.* ***It may therefore be a better predictor of CHLa than the ratio of Temp to Q***. The reason for using the inverse of conductivity is so that high values of the ratio will be indicative of warm, dry conditions, and low values of the ratio will be indicative of cold, wet conditions.
+
+-   As before, run the model by year and for all data combined.
+
+-   output to contain a table of coefficients to compare against those you have previously generated based on T:Q and T:4-day average Q.
+
+-   make a plot of the residuals from the model (as a time series)
+
+#### 2 Jan 2024
+
+A few details to clean up for the final version:
+
+With regard to further analysis of these data, I'm surprised that our attempts to improve the model by using a 4-d average discharge, or substituting specific conductivity as a surrogate for river flow, have not been successful. I think the reason is that because the James is a large river, it responds more slowly to variation in runoff from the catchment. Therefore, the discharge on a given day is reasonably representative of recent discharge (past few days). There is one more thing we can try here, which is to fit a non-linear model to these data. Specifically, **a tangential model of the form: CHLa = CHLamax \* tanh ((alpha \* TQratio)/CHLamax)**. In this model **CHLa is your y variable**, and the TQratio is your x variable (same as your current Model 1, except CHLa is not ln-transformed). You are solving for two coefficients: CHLamax is the maximum CHLa attained (plateau of the line), and alpha is the rate of increase in CHLa with increasing TQratio (slope of the line). This model is often used for fitting photosynthesis-irradiance curves, only we are **substituting CHLa for Photosynthesis and the TQratio for Irradiance**. If you Google "R fitting photosynthesis-irradiance curves", you might find some useful code. There are two potential advantages of fitting this modeL: it would allow us to see whether alpha and CHLamax are changing over time (years), and it might work better (explain more variation), For example, if you look at the Model 1 results for 2023, you will notice that the model predicts continuously increasing CHLa over the entire range of TQ, whereas the data suggest that CHLa plateaus after TQ = \~0.20. The tangential model might capture this better.
+
+For the summary statistics we are using only the July-October data, but **for model fitting we want to use all the data (Jan-Dec) because we need the seasonal variation in T:Q to see the relationship.** The box-whisker plot looks good, and for this we are only using the Jul-Oct residuals.
+
+#### 7 Jan
+
+Yes it does not surprise me that you would need to seed the program with starting values to get it running. If you imagine a 3-dimensional landscape with x being the range of potential alphas and y being the range of CHLa-max, then elevation (z) is the resulting fit of the model (R2 or proportion of variation explained). The models are programmed to make small adjustments to x and y iteratively to yield higher R2 (i.e., to find the peak). Some model landscapes can be quite complex with multiple peaks. In these cases, the model solutions can be drawn to different peaks depending on their starting location in the landscape. This model is not so complex that it should have multiple peaks, as indicated by the fact that various starting locations eventually led to the same solution. However, I am not understanding how the range of potential solutions could yield negative CHLa max values, given that all CHLa values are positive. Perhaps it would be helpful to **generate individual plots (by year) with the data and model-predicted values, so we can see what is going on.**
+
+**In Table 1 (Summary Statistics) could you include** both average discharge based on the mean of all days for July-Oct (already in the table) and also based on **the mean discharge of the subset of Jul-Oct days that were sampling days (i.e., only dates when CHLa was measured)?**
+
+#### 15 Jan
+
+**For the plots, could you make these the same as for the other (linear) models, which is to say that these should be plots of CHLa vs T:Q (rather than observed vs. predicted) and showing the model fit.** Also, I notice that in the non-linear model results there seem to be **fewer datapoints (e.g., for 2010) in comparison to the linear models**. Not sure why...
+
+#### Additional notes
+
+Measuring conductance values can also indicate if water has become polluted from human factors such as agricultural and impervious surface runoff, septic leachate, and the use of road salts. However, it is important to mention that not all sources of water pollution are indicated by conductivity changes. For example, as oil doesn't conduct electricity, oil spills would not be detected when measuring the conductivity in water.
+
+'Tangential model' - typically used for photosythensis-irradiance curves.
+
+-   <https://enveurope.springeropen.com/articles/10.1186/s12302-020-00306-9>
+
+<br><br>
+
+## Project: Water Temperature Animated Plot
+
+#### 18 Jan
+
+As a next project, I would like to assess the possibility of using animation to depict changes in water temperature of the James. What I have found is that the mean and max water T has changed little over the past 10+ years, but the seasonal timing of the annual cycle has shifted forward dramatically. Which is to say that the James is warming faster in the Spring, and cooling faster in the Fall. The best figure I was able to come up with compares seasonal T cycles during the begining, middle and most recent part of the record.
+
+But I'm not sure if this is the most effective way to show these data. What I had in mind was an animation that would first draw the line of daily mean T for the 1st year (2009). Next we would see the line come across for 2010. Then the 2010 line would disappear, and the 2011 line would appear (the 2009 line remains as a reference). By showing the successive years of data, you could hopefully visualize that these are moving forward (to the left) with respect to time of year. At the conclusion, we would have only the 2009 data, and the most recent year of data remaining in the plot.
+
+#### Jan 25
+1. the line showing the first year of data (which remains visible) should be darker - it is hard to see in the subsequent plots.
+2. Please make the x-axis intervals ~30.5 days and replace the number labels with month labels (Jan, Feb, etc.).
+3. The font size for x- and y- axis labels should be bigger.  Also, the current year being displayed should be bigger and inside the plot.
+4. It appears there was an error in deriving the daily mean values for 2021.
+Not sure where the problem arose, but we will need to re-calculate the 2021 statistics.  I have attached a file containing the original (15 min) 2021 data.  The data are organized by month for Jan-May, and then Jun-Dec are all on a single page.  Could you run this file through R and generate an output file that has daily statistics (mean, min, max) for the variables: temperature, pH, SpCond, Turbidity, CHLa, ODOsat and ODOmg/L.  The variables are highlighted in the file (you can ignore PAR which is also highlighted).
+
+Lastly, you mentioned the issue where some line segments appear and then disappear.  Is this related to missing data?  i.e., where there is a data gap, the plot draws a line connecting last with next, then the line disappears and reappears.  If so, I wonder if a solution would be to fill-in the missing values with a linear interpolation?
+
+#### Jan 29/30
+
+2010 has no turbidity data
+
+#### Feb 5
+
+There is a span of missing data for Temp, SpCond and Turb from 7/22/2020 to 8/3/2020 - originally coded 0, must be made NA.
+
+Replace the Temp values in the animation with a linear interpolation
+
+update code and output, incl animation, to include 2023 data 
+
+
+## Project: Virginia Reservoir Temp and Dissolved Oxygen
+
+#### Feb 12
+
+For our next project, I was hoping you could help me **analyse reservoir temperature and oxygen data to assess the effects of climate change.**  I am hoping to publish these results and therefore there could be an opportunity for you to be included as a co-author of the paper.
+
+I have selected 41 lake stations for which I have at least 100 depth profiles recorded over the last 40+ years.  
+
+As a first step, I would simply like to extract the information for these 41 lake stations from the larger dataset that includes all lake stations.  The list of lake stations is found on page 2 of the attached file (Trend Sites), and the full dataset is on page 3.  The full dataset contains ~19,000 lines (profiles); the extracted dataset should be ~7700 lines.
+
+Once we have our trend site data in a separate file, I would like to derive the mean, min, max and Nobs by station and by month (for May-Oct) for one of the variables (Tmax; column G on page 3).  These results should go into a separate file which should have ~246 rows (41 stations x 6 months) and 6 columns (station ID, month, mean, min, max and Nobs).  That is, you would be deriving the average Tmax across years for each month (May, June, etc.) for each of the 41 stations. 
+
+Once you have that, please send it to me for review so I can eliminate suspicious data.
+
+
+
+
+
+

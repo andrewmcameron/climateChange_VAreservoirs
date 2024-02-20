@@ -1,0 +1,5 @@
+"0","knitr::opts_chunk$set(echo = TRUE)"
+"0",""
+"0","# Consider that a) you are delivering high quality products that are designed for replicability and ease of us. Thoughtfully annotated, broken into digestible, discrete chunks, easy to navigate, readme documentation. Custom functions deployed to reduce code-clutter and make it easier to modify variables, plots, tables; axis titles, labels, plot titles, table captions, etc are dynamically referenced to minimize the amount of manual code modification that is required from year to year."
+"0","# and b) you are doing this for well under 'market rate' for a skilled coder. (but, could anyone do this now, in the age of ChatGPT?)"
+"0",""

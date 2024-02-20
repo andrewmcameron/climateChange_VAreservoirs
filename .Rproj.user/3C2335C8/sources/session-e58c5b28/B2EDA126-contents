@@ -1,0 +1,17 @@
+error_list <- list()
+
+# Loop through each model stored in models_list
+for (key in names(models_list)) {
+  # Attempt to generate summary; catch any errors
+  tryCatch({
+    # Attempt to generate the summary for the model
+    summary.mblm(models_list[[key]])
+  }, error = function(e) {
+    # If an error occurs, record the key (station-month combination) and the error message
+    error_list[[key]] <- list(error_message = e$message)
+  })
+}
+names(models_list)[25]
+
+subset.df %>%
+  filter(FDT_STA_ID == "2-XDD000.40" & MonthNum == 5) -> x
