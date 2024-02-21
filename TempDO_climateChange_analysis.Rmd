@@ -1,0 +1,132 @@
+---
+title: 'Spatial and Temporal Analysis of Reservoir Warming Trends: Assessing Geographic
+  Gradients, Temporal Dynamics, and Regional Influences'
+date: "2024-02-21"
+output: 
+  html_document:
+    toc: TRUE
+    toc_depth: 4
+    toc_float: true
+---
+
+```{r setup, include=FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, echo = FALSE)
+library(dplyr)
+
+# read in data
+df <- readr::read_csv("TMax_monthlyByStation_mblmModelStatistics.csv")
+stations <- readr::read_csv("VADEQ_stationInfo.csv")
+
+# field to distinguish significant from not significant slopes
+
+
+# join into single df
+df.spatial <- df %>%
+  left_join(stations, join_by("FDT_STA_ID" == "Station_Id"))
+```
+
+## analysis 1: geographic gradients
+
+<br>
+
+### North-South
+
+```{r}
+library(ggplot2)
+
+# ROC vs Latitude 
+ggplot() +
+  geom_point(data = df.spatial, aes(x = Latitude, y = model_slope, color = factor(Month)),
+             alpha = .6) +
+  geom_smooth(data = df.spatial, aes(x = Latitude,  y = model_slope),
+              method = "lm") +
+  labs(title = "Warming Rates vs. Latitude",
+       x = "Latitude",
+       y = "Rate of Warming",
+       color = "Month") +
+  theme_minimal()
+
+```
+<br>
+#### linear model summary
+```{r}
+latitude_summary <- summary(lm(model_slope ~ Latitude, df.spatial))
+
+latitude_summary
+```
+
+<br>
+
+### East-West
+
+```{r}
+# ROC vs Longitude 
+ggplot() +
+  geom_point(data = df.spatial, aes(x = Longitude, y = model_slope, color = factor(Month)),
+             alpha = .6) +
+  geom_smooth(data = df.spatial, aes(x = Longitude,  y = model_slope),
+              method = "lm") +
+  labs(title = "Warming Rates vs. Longitude",
+       x = "Longitude",
+       y = "Rate of Warming",
+       color = "Month") +
+  theme_minimal()
+```
+
+<br>
+#### linear model summary
+```{r}
+longitude_summary <- summary(lm(model_slope ~ Longitude, df.spatial))
+
+longitude_summary
+```
+
+<br>
+
+### month by month plots
+```{r}
+# Faceting plots by month
+ggplot(data = df.spatial, aes(x = Latitude, y = model_slope)) +
+  geom_point() +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Monthly Warming Rates vs. Latitude",
+       x = "Latitude",
+       y = "Rate of Warming") +
+  theme_minimal()
+
+
+ggplot(data = df.spatial, aes(x = Longitude, y = model_slope)) +
+  geom_point() +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Monthly Warming Rates vs. Longitude",
+       x = "Longitude",
+       y = "Rate of Warming") +
+  theme_minimal()
+
+```
+
+<br>
+
+## analysis 2: warming vs monitoring span
+
+```{r}
+# determine monitoring record length
+df.span <- df.spatial %>%
+  mutate(monitoring_length = 
+           as.numeric((lubridate::mdy(df.spatial$LAST_SAMPLE_DATE) - lubridate::mdy(df.spatial$FIRST_SAMPLE_DATE))/365)
+  )
+
+
+ggplot() +
+  geom_point(data = df.span,
+             aes(x = monitoring_length, y = model_slope,
+                 color = factor(Month))) +
+  geom_smooth(data = df.span, aes(x = monitoring_length,  y = model_slope),
+              method = "lm") +
+  labs(title = "Warming Rates vs. Monitoring Span",
+       x = "Monitoring Span (years)",
+       y = "Rate of Warming",
+       color = "Month") +
+  theme_minimal()
+
+```

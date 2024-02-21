@@ -1,0 +1,153 @@
+---
+title: "Temperature in VA Reservoirs, part I"
+author: "Andrew Cameron"
+date: "2024-02-14"
+output: html_document
+---
+
+Data wrangling and median-based linear modeling to determine warming rates in reservoirs over time. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+
+```
+
+
+```{r `read in data`}
+trendSites.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
+allData.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3)
+
+# Convert `date` column from Excel encoded date to a more legible date format. Otherwise date shows as numeric value, e.g. '44230'.
+    allData.df$Date <- allData.df$Date * 86400      # 86400 = seconds in a day.
+    allData.df$Date <- as.POSIXct(allData.df$Date, origin = "1899-12-30", tz = "UTC")
+    
+```
+
+```{r 'remove anomlies'}
+# a surface temperature (Tmax) of 2.8 C in August
+# 13774 	6ACNR000.00 	8/28/1990 	0.3 	NA 	NA 	NA 	NA
+
+which(grepl("13774", allData.df$X1))
+allData.df[13770, (5:8)] <- NA
+
+```
+
+```{r `subset data`}
+# filter for rows corresponding to the 41 stations
+station_IDS <- trendSites.df$FDT_STA_ID
+subset.df <- allData.df %>%
+  mutate(MonthNum = lubridate::month(Date)) %>%  
+  filter(FDT_STA_ID %in% station_IDS) %>%
+  filter(MonthNum %in% 5:10)
+
+
+monthlyStation_stats <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(Mean = mean(TMax, na.rm = TRUE),
+            Min = min(TMax, na.rm = TRUE),
+            Max = max(TMax, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop') %>%
+  mutate(Month = month.name[MonthNum])
+
+# write_csv(monthlyStation_stats, "TMax_stats_monthlyByStation.csv")
+
+```
+
+```{r `derive Temp Anomaly`}
+# The next step is to create a new variable in the Merged Profile & Meta Data dataset, which is the Temperature Anomaly. 
+# This is the difference between the observed temperature on a given date and the long-term average temperature. 
+# For example, for the first station (2-JKS044.60) the long-term mean surface T for May is 19.0, so you would subtract that from all May observations for this station (N=18). When the observed T is greater than mean T, this returns a positive number (above-average T), and when observed < average you get a negative anomaly.
+
+cols_to_keep <- colnames(subset.df)
+
+subset.df <- subset.df %>%
+  left_join(monthlyStation_stats, by = c("FDT_STA_ID", "MonthNum")) %>%
+  select(cols_to_keep, Mean) %>%
+  mutate(TAnomaly = TMean - Mean)
+
+```
+
+```{r `fit regressions for each month-station`}
+# fit a linear regression for anomaly values vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
+
+# install.packages("mblm")
+library(mblm)
+
+#Usage
+#mblm(formula, dataframe, repeated = TRUE)
+  #Arguments
+    #formula A formula of type y ~ x (only linear models are accepted)
+    #dataframe Optional dataframe
+    #repeated If set to true, model is computed using repeated medians. If false, a single median estimators are calculated
+
+subset.df$Year <- year(subset.df$Date)
+
+# remove NA values -- mblm() does not handle NA as lm() does
+subset.df <- subset.df %>%
+  filter(!is.na(TAnomaly))
+
+# create list to store regression results
+modelSummaries <- list()
+
+for (station_id in unique(subset.df$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- subset.df %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(TAnomaly ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4]
+        )
+  }
+}
+
+# mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+monthlyStation_stats <- monthlyStation_stats %>%
+  mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA)
+
+for (i in 1:nrow(monthlyStation_stats)) {
+  key = monthlyStation_stats$key[i]
+  
+  monthlyStation_stats$model_slope[i] <-  modelSummaries[[key]]$slope
+   monthlyStation_stats$model_MAD[i] <-  modelSummaries[[key]]$MAD
+    monthlyStation_stats$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  
+}
+
+
+monthlyStation_stats %>%
+  select(-key) -> df_final
+
+write_csv(df_final, "TMax_monthlyByStation_mblmModelStatistics.csv")
+```
+
+```{r}
+
+length(which(deliverable$model_pval < .06))
+
+deliverable %>%
+  filter(model_pval < 0.05) %>%
+  filter(model_slope > 0 ) -> signif.pVal_pos.Slope
+
+summary(signif.pVal_pos.Slope$model_slope)
+
+```
+
+
