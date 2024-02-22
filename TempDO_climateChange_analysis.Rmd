@@ -18,96 +18,55 @@ df <- readr::read_csv("TMax_monthlyByStation_mblmModelStatistics.csv")
 stations <- readr::read_csv("VADEQ_stationInfo.csv")
 
 # field to distinguish significant from not significant slopes
-
+df$trend <- ifelse(df$model_pval <= 0.05, "significnant", "not significant")
 
 # join into single df
 df.spatial <- df %>%
   left_join(stations, join_by("FDT_STA_ID" == "Station_Id"))
 ```
 
-## analysis 1: geographic gradients
+## warming vs. lat/long
 
 <br>
 
-### North-South
-
-```{r}
+```{r, message = FALSE}
 library(ggplot2)
 
-# ROC vs Latitude 
-ggplot() +
-  geom_point(data = df.spatial, aes(x = Latitude, y = model_slope, color = factor(Month)),
-             alpha = .6) +
-  geom_smooth(data = df.spatial, aes(x = Latitude,  y = model_slope),
-              method = "lm") +
-  labs(title = "Warming Rates vs. Latitude",
-       x = "Latitude",
-       y = "Rate of Warming",
-       color = "Month") +
-  theme_minimal()
 
-```
-<br>
-#### linear model summary
-```{r}
-latitude_summary <- summary(lm(model_slope ~ Latitude, df.spatial))
-
-latitude_summary
-```
-
-<br>
-
-### East-West
-
-```{r}
-# ROC vs Longitude 
-ggplot() +
-  geom_point(data = df.spatial, aes(x = Longitude, y = model_slope, color = factor(Month)),
-             alpha = .6) +
-  geom_smooth(data = df.spatial, aes(x = Longitude,  y = model_slope),
-              method = "lm") +
-  labs(title = "Warming Rates vs. Longitude",
-       x = "Longitude",
-       y = "Rate of Warming",
-       color = "Month") +
-  theme_minimal()
-```
-
-<br>
-#### linear model summary
-```{r}
-longitude_summary <- summary(lm(model_slope ~ Longitude, df.spatial))
-
-longitude_summary
-```
-
-<br>
-
-### month by month plots
-```{r}
 # Faceting plots by month
 ggplot(data = df.spatial, aes(x = Latitude, y = model_slope)) +
-  geom_point() +
+  geom_point(aes(shape = trend), alpha = .6) +
+  geom_smooth(data = df.spatial, aes(x = Latitude,  y = model_slope),
+              method = "lm") +
   facet_wrap(~factor(Month), scales = "free_y") +
   labs(title = "Monthly Warming Rates vs. Latitude",
        x = "Latitude",
        y = "Rate of Warming") +
-  theme_minimal()
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() +
+  theme(legend.position = "top") 
+```
+<br>
 
+```{r}
 
 ggplot(data = df.spatial, aes(x = Longitude, y = model_slope)) +
-  geom_point() +
+  geom_point(aes(shape = trend), alpha = .6) +
+  geom_smooth(data = df.spatial, aes(x = Longitude,  y = model_slope),
+              method = "lm") +
   facet_wrap(~factor(Month), scales = "free_y") +
   labs(title = "Monthly Warming Rates vs. Longitude",
        x = "Longitude",
        y = "Rate of Warming") +
-  theme_minimal()
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() +
+  theme(legend.position = "top") 
 
 ```
 
 <br>
 
-## analysis 2: warming vs monitoring span
+## warming vs monitoring span
 
 ```{r}
 # determine monitoring record length
@@ -120,13 +79,93 @@ df.span <- df.spatial %>%
 ggplot() +
   geom_point(data = df.span,
              aes(x = monitoring_length, y = model_slope,
-                 color = factor(Month))) +
+                 shape = trend)) +
   geom_smooth(data = df.span, aes(x = monitoring_length,  y = model_slope),
               method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
   labs(title = "Warming Rates vs. Monitoring Span",
        x = "Monitoring Span (years)",
-       y = "Rate of Warming",
-       color = "Month") +
-  theme_minimal()
+       y = "Rate of Warming") +  
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() + 
+  theme(legend.position = "top") 
+
+```
+
+<br>
+
+## warming vs. monitoring start year
+
+```{r}
+trend.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
+
+whatIneed <- trend.df[, c(2, 4:5)]
+
+df <- df %>%
+  left_join(whatIneed, join_by("FDT_STA_ID"))
+
+
+ggplot() +
+  geom_point(data = df,
+             aes(x = MinYear, y = model_slope,
+                 shape = trend), alpha = .6) +
+  geom_smooth(data = df, aes(x = MinYear,  y = model_slope),
+              method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Warming Rates vs. Initial Monitoring Year",
+       x = "First Year of Monitoring",
+       y = "Rate of Warming") +  
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() + 
+  theme(legend.position = "top") 
+
+```
+<br>
+
+## warming vs. midpoint of years
+
+```{r}
+df.mid <- df %>%
+  mutate(midpoint = (MaxYear + MinYear) / 2)
+
+
+
+ggplot() +
+  geom_point(data = df.mid,
+             aes(x = midpoint, y = model_slope,
+                 shape = trend), alpha = .6) +
+  geom_smooth(data = df.mid, aes(x = midpoint,  y = model_slope),
+              method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Warming Rates vs. Monitoring Midpoint",
+       x = "Monitoring Midpoint",
+       y = "Rate of Warming") +  
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() + 
+  theme(legend.position = "top") 
+
+```
+
+## warming vs level III ecoregions
+
+```{r, message = FALSE, echo = TRUE}
+library(sf)
+
+# read in ecoregions shapefile
+eco.sf <- st_read("C:/Users/CameronAM/Desktop/climateChange_VAreservoirs/ecoregions_shp")
+
+# transform primary df to sf object
+df.spatial <- st_as_sf(df.spatial, coords = c("Longitude", "Latitude"), crs = 4326)
+
+# convert to same crs as ecoregions
+df.spatial <- st_transform(df.spatial, crs = st_crs(eco.sf))
+
+# spatial join ecoregions to reservoir data 
+eco.sf <- eco.sf %>%
+  select(US_L3CODE, US_L3NAME, geometry)
+ecoregions.df <- st_join(df.spatial, eco.sf)
+
+
+unique(ecoregions.df$US_L3NAME)
 
 ```
