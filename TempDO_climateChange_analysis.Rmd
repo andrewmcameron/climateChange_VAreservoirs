@@ -17,6 +17,8 @@ library(dplyr)
 df <- readr::read_csv("TMax_monthlyByStation_mblmModelStatistics.csv")
 stations <- readr::read_csv("VADEQ_stationInfo.csv")
 
+df$Month <- factor(df$Month, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"))
+
 # field to distinguish significant from not significant slopes
 df$trend <- ifelse(df$model_pval <= 0.05, "significnant", "not significant")
 
@@ -148,11 +150,11 @@ ggplot() +
 
 ## warming vs level III ecoregions
 
-```{r, message = FALSE, echo = TRUE}
+```{r, message = FALSE, include=FALSE}
 library(sf)
 
 # read in ecoregions shapefile
-eco.sf <- st_read("C:/Users/CameronAM/Desktop/climateChange_VAreservoirs/ecoregions_shp")
+eco.sf <- suppressMessages(st_read("ecoregions_shp"))
 
 # transform primary df to sf object
 df.spatial <- st_as_sf(df.spatial, coords = c("Longitude", "Latitude"), crs = 4326)
@@ -169,3 +171,25 @@ ecoregions.df <- st_join(df.spatial, eco.sf)
 unique(ecoregions.df$US_L3NAME)
 
 ```
+
+```{r}
+
+p <- ecoregions.df %>%
+  group_by(US_L3NAME, Month) %>%
+  summarize(mean_anomaly = mean(model_slope))
+
+ ggplot(p, aes(x = US_L3NAME, y = mean_anomaly, fill = US_L3NAME)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Mean Warming Anomaly by Ecoregion and Month",
+       x = "Ecoregion",
+       y = "Mean Warming Anomaly",
+       fill = "Ecoregion") +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  theme(axis.text.x = element_blank())
+
+
+
+```
+
