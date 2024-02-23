@@ -189,7 +189,7 @@ p <- ecoregions.df %>%
   theme(legend.position = "top") +
   theme(axis.text.x = element_blank())
 
-
+p
 
 ```
 
