@@ -39,18 +39,41 @@ library(ggplot2)
 ggplot(data = df.spatial, aes(x = Latitude, y = model_slope)) +
   geom_point(aes(shape = trend), alpha = .6) +
   geom_smooth(data = df.spatial, aes(x = Latitude,  y = model_slope),
-              method = "lm") +
+              method = mblm::mblm(model_slope ~ Latitude, df.spatial)) +
   facet_wrap(~factor(Month), scales = "free_y") +
   labs(title = "Monthly Warming Rates vs. Latitude",
        x = "Latitude",
-       y = "Rate of Warming") +
+       y = "T Trend (C/y)") +
   scale_shape_manual(values = c(1, 16)) +
   theme_minimal() +
-  theme(legend.position = "top") 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5)) 
 ```
 <br>
 
 ```{r}
+# prepare all months mean slope data frame 
+all_months_mean <- df.spatial %>%
+  group_by(FDT_STA_ID, Longitude, Latitude) %>%
+  summarize(mean_slope = mean(model_slope),
+            .groups = "drop")
+  
+  
+ggplot(data = all_months_mean, aes(x = Longitude, y = mean_slope)) +
+  geom_point(alpha = .6) +
+  geom_smooth(data = all_months_mean, aes(x = Longitude,  y = mean_slope),
+              method = "lm") +
+  labs(title = "Mean Warming Rate (May-Oct) vs. Longitude",
+       x = "Longitude",
+       y = "T Trend (C/y)") +
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5))
+
+```
+
+```{r `vs lat, by month`}
 
 ggplot(data = df.spatial, aes(x = Longitude, y = model_slope)) +
   geom_point(aes(shape = trend), alpha = .6) +
@@ -59,10 +82,26 @@ ggplot(data = df.spatial, aes(x = Longitude, y = model_slope)) +
   facet_wrap(~factor(Month), scales = "free_y") +
   labs(title = "Monthly Warming Rates vs. Longitude",
        x = "Longitude",
-       y = "Rate of Warming") +
+       y = "T Trend (C/y)") +
   scale_shape_manual(values = c(1, 16)) +
   theme_minimal() +
-  theme(legend.position = "top") 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5))
+
+```
+
+```{r `vs lat, all months`}
+ggplot(data = all_months_mean, aes(x = Latitude, y = mean_slope)) +
+  geom_point(alpha = .6) +
+  geom_smooth(data = all_months_mean, aes(x = Latitude,  y = mean_slope),
+              method = "lm") +
+  labs(title = "Mean Warming Rate (May-Oct) vs. Latitude",
+       x = "Latitude",
+       y = "T Trend (C/y)") +
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5))
 
 ```
 
@@ -70,7 +109,7 @@ ggplot(data = df.spatial, aes(x = Longitude, y = model_slope)) +
 
 ## warming vs monitoring span
 
-```{r}
+```{r `vs monitoring span, by month`}
 # determine monitoring record length
 df.span <- df.spatial %>%
   mutate(monitoring_length = 
@@ -86,19 +125,41 @@ ggplot() +
               method = "lm") +
   facet_wrap(~factor(Month), scales = "free_y") +
   labs(title = "Warming Rates vs. Monitoring Span",
-       x = "Monitoring Span (years)",
-       y = "Rate of Warming") +  
+       x = "Monitoring Span (y)",
+       y = "T Trend (C/y)") +  
   scale_shape_manual(values = c(1, 16)) +
   theme_minimal() + 
-  theme(legend.position = "top") 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5))
 
+```
+
+```{r}
+df.span_summary <- df.span %>%
+  group_by(FDT_STA_ID, monitoring_length ) %>%
+  summarize(monitoring_length = mean(monitoring_length))
+
+all_months_mean <- all_months_mean %>% 
+  left_join(df.span_summary, join_by("FDT_STA_ID"))
+
+ggplot(data = all_months_mean, aes(x = monitoring_length, y = mean_slope)) +
+  geom_point(alpha = .6) +
+  geom_smooth(data = all_months_mean, aes(x = monitoring_length,  y = mean_slope),
+              method = "lm") +
+  labs(title = "Mean Warming Rate (May-Oct) vs. Monitoring Span",
+       x = "Monitoring Span (y)",
+       y = "T Trend (C/y)") +
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5))
 ```
 
 <br>
 
 ## warming vs. monitoring start year
 
-```{r}
+```{r `vs start year, by month`}
 trend.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
 
 whatIneed <- trend.df[, c(2, 4:5)]
@@ -116,20 +177,44 @@ ggplot() +
   facet_wrap(~factor(Month), scales = "free_y") +
   labs(title = "Warming Rates vs. Initial Monitoring Year",
        x = "First Year of Monitoring",
-       y = "Rate of Warming") +  
+       y = "T Trend (C/y)") +  
   scale_shape_manual(values = c(1, 16)) +
   theme_minimal() + 
-  theme(legend.position = "top") 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5)) 
 
 ```
 <br>
 
+
+```{r `vs start year, all months}
+df.minYear <- df %>%
+  group_by(FDT_STA_ID, MinYear ) %>%
+  summarize(MinYear = mean(MinYear))
+
+all_months_mean <- all_months_mean %>% 
+  left_join(df.minYear, join_by("FDT_STA_ID"))
+
+ggplot(data = all_months_mean, aes(x = MinYear, y = mean_slope)) +
+  geom_point(alpha = .6) +
+  geom_smooth(data = all_months_mean, aes(x = MinYear,  y = mean_slope),
+              method = "lm") +
+  labs(title = "Mean Warming Rate (May-Oct) vs. Initial Monitoring Year",
+       x = "First Year of Monitoring",
+       y = "T Trend (C/y)") +
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5))
+
+```
+<br><br>
+
 ## warming vs. midpoint of years
 
-```{r}
+```{r `vs midpoint, by month`}
 df.mid <- df %>%
   mutate(midpoint = (MaxYear + MinYear) / 2)
-
 
 
 ggplot() +
@@ -141,13 +226,39 @@ ggplot() +
   facet_wrap(~factor(Month), scales = "free_y") +
   labs(title = "Warming Rates vs. Monitoring Midpoint",
        x = "Monitoring Midpoint",
-       y = "Rate of Warming") +  
+       y = "T Trend (C/y)") +  
   scale_shape_manual(values = c(1, 16)) +
   theme_minimal() + 
-  theme(legend.position = "top") 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5))
 
 ```
 
+<br>
+```{r `vs midpoint, all months}
+
+df.mid_summary <- df.mid %>%
+  group_by(FDT_STA_ID, MinYear ) %>%
+  summarize(midpoint = mean(midpoint))
+
+all_months_mean <- all_months_mean %>% 
+  left_join(df.mid_summary, join_by("FDT_STA_ID"))
+
+ggplot(data = all_months_mean, aes(x = midpoint, y = mean_slope)) +
+  geom_point(alpha = .6) +
+  geom_smooth(data = all_months_mean, aes(x = midpoint,  y = mean_slope),
+              method = "lm") +
+  labs(title = "Mean Warming Rate (May-Oct) vs. Monitoring Midpoint",
+       x = "Monitoring Midpoint",
+       y = "T Trend (C/y)") +
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5))
+
+
+```
+<br><br>
 ## warming vs level III ecoregions
 
 ```{r, message = FALSE, include=FALSE}
@@ -189,7 +300,66 @@ p <- ecoregions.df %>%
   theme(legend.position = "top") +
   theme(axis.text.x = element_blank())
 
+```
 
+## warming vs profile depth
+
+```{r}
+depth.data <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3) %>%
+  select(FDT_STA_ID, MaxDepth.y) %>%
+  group_by(FDT_STA_ID) %>%
+  summarize(max.depth = first(MaxDepth.y))
+
+depth.data
+
+depth.data <- df %>%
+  left_join(depth.data, join_by("FDT_STA_ID"))
+
+
+ggplot() +
+  geom_point(data = depth.data,
+             aes(x = max.depth, y = model_slope,
+                 shape = trend), alpha = .6) +
+  geom_smooth(data = depth.data, aes(x = max.depth,  y = model_slope),
+              method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Warming Rates vs. Max Profile Depth",
+       x = "Max Profile Depth (m)",
+       y = "T Trend (C/y)") +  
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() + 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5))
 
 ```
 
+
+```{r}
+sen <- function(formula, data, weights = NULL) {
+  mblm::mblm(qsec ~ wt, data = mtcars)
+}
+
+mtcars %>% 
+  ggplot(aes(qsec, wt)) +   
+  geom_point() +     
+  geom_smooth(method = sen)
+
+```
+** https://stackoverflow.com/questions/61451295/using-theil-sen-method-when-plotting-with-geom-smooth **
+2. Let's also make a boxplot that shows the variation in warming rates for each month.  This would be a single panel with a box for each of the 6 months.  It would also be useful to calculate the average warming rate across months for a given station, and to include this distribution as a 7th box along with the individual months.
+
+3. Along the same lines, could you add the All Months average as a separate plot  to each set of 6 that you have already made (e.g., long, lat, start year, etc.).
+
+5. For the Ecoregion results, could you also make these as box plots instead of bar plots?  There would be one plot for each month (containing 4 boxes for the 4 regions) plus the All Months average.  These 7 plots should have the same y axis scale.
+
+6. Lastly, we have one site where monitoring began before 1970.  Could you make plots of anomaly vs. year with mblm regressions for the 6 months (and show the slope and p value on the plot)?
+
+
+```{r `PLOTTING MBLM REGRESSION`, eval = FALSE}
+ts_fit<-mblm(model_slope ~ Latitude, df.spatial)
+
+ggplot(df.spatial,aes(x=Latitude,y=model_slope)) + 
+  geom_point(size=3,pch=7) +     
+  geom_abline(intercept = coef(ts_fit)[1], slope = coef(ts_fit)[2])
+
+```
