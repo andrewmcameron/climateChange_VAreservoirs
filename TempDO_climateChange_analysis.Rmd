@@ -411,20 +411,28 @@ mblm_fits <- pre70 %>%
 # create df to use for plotting
 plottingData <- merge(pre70, mblm_fits, by = "Month")
 
+my_labels <- c()
+
+for (month in month.name[5:10]) {
+  my_labels <- c(my_labels, mblm_fits %>%
+                   filter(Month == month) %>%
+                   summarise(label = paste("Slope:", round(slope, 3), "\np-value:", round(`p val`, 4))) %>%
+                   pull(label))
+}
 
 annotation_data <- data.frame(
   Month = factor(c("May", "June", "July", "August", "September", "October")),
   x = c(2010,2010,2010, 1982, 1982, 1982), 
   y = c(-4, -3.75, -3, -3, -3, -3),  
-  label = paste("Slope:", round(plottingData$slope["Month" ], 3), "P-value:", round(plottingData$`p val`, 4))
-  )
+  label = my_labels)
+    
 
-  
   
 ggplot(data = plottingData) +
   geom_point(aes(x = Year, y = TAnomaly), alpha = .6, size = 2) +
   geom_abline(aes(intercept = intercept, slope = slope), color = "blue", linewidth = 1) +
   facet_wrap(~factor(Month), scales = "free_y") +
+  geom_text(data = annotation_data, aes(x = x, y = y, label = label), inherit.aes = FALSE, check_overlap = TRUE) +
   labs(title = "Warming Rates vs. Year, Roanoke River Station 4AROA038.49",
        x = "Year",
        y = "T Trend (C/y)") +  
@@ -438,12 +446,6 @@ ggplot(data = plottingData) +
         legend.text = element_text(size = 9.5),  # Adjusts legend text size
         legend.title = element_text(size = 10.5),  # Adjusts legend title size
         strip.text = element_text(size = 12))  # Adjusts facet label size
-
-dat <- subset(mtcars, wt > 2.75 & wt < 3.45)
-dat$car <- rownames(dat)
-
-p <- ggplot(dat, aes(wt, mpg, label = car)) +
-  geom_point(color = "red")
 
 ```
 
