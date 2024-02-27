@@ -365,7 +365,7 @@ mblm regressions by month for Roanoke River station, the only monitoring station
 
 pre70 <- pre70 %>%
   left_join(pre70_summary, by = c("FDT_STA_ID", "MonthNum")) %>%
-  mutate(TAnomaly = TMean - Mean)
+  mutate(TAnomaly = TMax - Mean)
 
 
 pre70$Year <- lubridate::year(pre70$Date)
@@ -473,8 +473,35 @@ ggplot(data = plottingData) +
 
 ```
 
+```{r, include = FALSE, eval = FALSE, echo = FALSE}
+# Paul's data to compare against
+kerr <- readr::read_csv("kerr_tanomaly.csv")
+
+kerr.paul <- kerr %>%
+  mutate(Date = mdy(Date)) %>%
+  select(`Mean Tmax`, TMean, 'Tmax Anom', Date) %>%
+  filter(month(Date) %in% c(5:10))
+
+any(is.na(kerr$`Tmax Anom`)) # no NA values
+
+# -- Review data on my end
+
+kerr.mine <- subset.df %>%
+  filter(FDT_STA_ID == kerr$FDT_STA_ID[1]) %>%
+  select(Date, TMax, TMean, TAnomaly)
+
+p <- kerr.mine %>%
+  left_join(kerr.paul, by = "Date")
+
+p <- p %>%
+  mutate(TAnomaly = round(TAnomaly, 1))
+
+problemIndices <- which(p$TAnomaly != p$`Tmax Anom`)
+
+p
 
 
+```
 
 
 

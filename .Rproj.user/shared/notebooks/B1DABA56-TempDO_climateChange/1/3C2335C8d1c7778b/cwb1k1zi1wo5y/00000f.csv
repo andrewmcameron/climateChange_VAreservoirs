@@ -1,7 +1,0 @@
-"0","trendSites.df <- openxlsx::read.xlsx(""data_original.xlsx"", sheet = 2)"
-"0","allData.df <- openxlsx::read.xlsx(""data_original.xlsx"", sheet = 3)"
-"0",""
-"0","# Convert `date` column from Excel encoded date to a more legible date format. Otherwise date shows as numeric value, e.g. '44230'."
-"0","    allData.df$Date <- allData.df$Date * 86400      # 86400 = seconds in a day."
-"0","    allData.df$Date <- as.POSIXct(allData.df$Date, origin = ""1899-12-30"", tz = ""UTC"")"
-"0","    "
