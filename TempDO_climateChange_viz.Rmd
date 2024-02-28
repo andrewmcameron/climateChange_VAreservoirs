@@ -1,0 +1,510 @@
+---
+title: 'Spatial and Temporal Analysis of Reservoir Warming Trends: Assessing Geographic
+  Gradients, Temporal Dynamics, and Regional Influences'
+date: "2024-02-21"
+output: 
+  html_document:
+    toc: TRUE
+    toc_depth: 4
+    toc_float: true
+---
+
+```{r setup, include=FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, echo = FALSE)
+library(dplyr)
+library(ggplot2)
+
+# read in data
+df <- readr::read_csv("TMax_monthlyByStation_mblmModelStatistics.csv")
+df.stations <- readr::read_csv("VADEQ_stationInfo.csv")
+df.trendSites <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
+df.merged <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3)
+```
+
+```{r `derive/prepare plotting data`}
+# derive mean warming and incorporate back into df for plotting
+all_months_mean <- df %>%
+  group_by(FDT_STA_ID) %>%
+  summarize(mean_slope = mean(model_slope, na.rm = TRUE),
+            .groups = "drop") %>%
+  mutate(Month = "All Months",
+         trend= "N/A")
+
+df <- bind_rows(df, all_months_mean)
+
+# populate model slope column with mean slope where Month == "All Months"
+df <- df %>%
+  mutate(model_slope = if_else(Month == "All Months", mean_slope, model_slope))
+
+  
+# set month as factor and join long/lat data
+df <- df %>%
+  mutate(Month = factor(Month, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", "All Months")),
+         trend = ifelse(is.na(df$model_pval), "N/A",
+                        ifelse(df$model_pval <= 0.05, "significant", "not significant"))) %>%
+  left_join(df.stations, join_by("FDT_STA_ID" == "Station_Id"))
+
+df$trend <- factor(df$trend, levels = c("significant", "not significant", "N/A"))
+
+# derive  monitoring record length
+df <- df %>%
+  mutate(monitoring_length = 
+           as.numeric(
+             (lubridate::mdy(df$LAST_SAMPLE_DATE) - 
+                lubridate::mdy(df$FIRST_SAMPLE_DATE))
+             /365)
+  )
+
+# derive  monitoring span
+whatIneed <- df.trendSites[, c(2, 4:5)]
+df <- df %>%
+  left_join(whatIneed, join_by("FDT_STA_ID"))
+
+# derive midpoint
+df <- df %>%
+  mutate(midpoint = (MaxYear + MinYear) / 2)
+
+# derive profile depth
+depth.data <- df.merged %>%
+  select(FDT_STA_ID, MaxDepth.y) %>%
+  group_by(FDT_STA_ID) %>%
+  summarize(max.depth = first(MaxDepth.y))
+
+df <- df %>%
+  left_join(depth.data, join_by("FDT_STA_ID"))
+
+
+```
+
+## warming vs. lat/long
+
+<br>
+
+```{r `vs lat, by month`, fig.height = 6.5, message = FALSE}
+# Faceting plots by month
+ggplot(data = df, aes(x = Latitude, y = model_slope)) +
+  geom_point(aes(shape = trend), alpha = .6, size =2) +
+  geom_smooth(data = df, aes(x = Latitude,  y = model_slope),
+              method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Monthly Warming Rates vs. Latitude",
+       x = "Latitude",
+       y = "T Trend (C/y)") +
+  scale_shape_manual(values = c(1, 16, 10)) +
+  theme_minimal() +
+theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),  # Adjusts plot title size
+        axis.title = element_text(size = 14),  # Adjusts axis titles size
+        axis.text = element_text(size = 11.5),  # Adjusts axis text size
+        legend.text = element_text(size = 9.5),  # Adjusts legend text size
+        legend.title = element_text(size = 10.5),  # Adjusts legend title size
+        strip.text = element_text(size = 12))  # Adjusts facet label size
+```
+
+<br>
+
+```{r `vs long, by month`, fig.height=6.5}
+
+ggplot(data = df, aes(x = Longitude, y = model_slope)) +
+  geom_point(aes(shape = trend), alpha = .6, size = 2) +
+  geom_smooth(data = df, aes(x = Longitude,  y = model_slope),
+              method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Monthly Warming Rates vs. Longitude",
+       x = "Longitude",
+       y = "T Trend (C/y)") +
+  scale_shape_manual(values = c(1, 16, 10)) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),  # Adjusts plot title size
+        axis.title = element_text(size = 14),  # Adjusts axis titles size
+        axis.text = element_text(size = 11.5),  # Adjusts axis text size
+        legend.text = element_text(size = 9.5),  # Adjusts legend text size
+        legend.title = element_text(size = 10.5),  # Adjusts legend title size
+        strip.text = element_text(size = 12))  # Adjusts facet label size
+
+```
+
+<br>
+
+
+## warming vs monitoring span
+
+```{r `vs monitoring span, by month`, fig.height = 6.5}
+
+ggplot() +
+  geom_point(data = df,
+             aes(x = monitoring_length, y = model_slope,
+                 shape = trend), alpha = .6, size = 2) +
+  geom_smooth(data = df, aes(x = monitoring_length,  y = model_slope),
+              method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Warming Rates vs. Monitoring Span",
+       x = "Monitoring Span (y)",
+       y = "T Trend (C/y)") +  
+  scale_shape_manual(values = c(1, 16, 10)) +
+  theme_minimal() + 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),  # Adjusts plot title size
+        axis.title = element_text(size = 14),  # Adjusts axis titles size
+        axis.text = element_text(size = 11.5),  # Adjusts axis text size
+        legend.text = element_text(size = 9.5),  # Adjusts legend text size
+        legend.title = element_text(size = 10.5),  # Adjusts legend title size
+        strip.text = element_text(size = 12))  # Adjusts facet label size
+
+```
+
+<br>
+
+## warming vs. monitoring start year
+
+```{r `vs start year, by month`, fig.height = 6.5}
+ggplot() +
+  geom_point(data = df,
+             aes(x = MinYear, y = model_slope,
+                 shape = trend), alpha = .6, size = 2) +
+  geom_smooth(data = df, aes(x = MinYear,  y = model_slope),
+              method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Warming Rates vs. Initial Monitoring Year",
+       x = "First Year of Monitoring",
+       y = "T Trend (C/y)") +  
+  scale_shape_manual(values = c(1, 16, 10)) +
+  theme_minimal() + 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),  # Adjusts plot title size
+        axis.title = element_text(size = 14),  # Adjusts axis titles size
+        axis.text = element_text(size = 11.5),  # Adjusts axis text size
+        legend.text = element_text(size = 9.5),  # Adjusts legend text size
+        legend.title = element_text(size = 10.5),  # Adjusts legend title size
+        strip.text = element_text(size = 12))  # Adjusts facet label size
+```
+
+<br><br>
+
+## warming vs. midpoint of years
+
+```{r `vs midpoint, by month`, fig.height = 6.5}
+ggplot() +
+  geom_point(data = df,
+             aes(x = midpoint, y = model_slope,
+                 shape = trend), alpha = .6, size = 2) +
+  geom_smooth(data = df, aes(x = midpoint,  y = model_slope),
+              method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Warming Rates vs. Monitoring Midpoint",
+       x = "Monitoring Midpoint",
+       y = "T Trend (C/y)") +  
+  scale_shape_manual(values = c(1, 16, 10)) +
+  theme_minimal() + 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),  # Adjusts plot title size
+        axis.title = element_text(size = 14),  # Adjusts axis titles size
+        axis.text = element_text(size = 11.5),  # Adjusts axis text size
+        legend.text = element_text(size = 9.5),  # Adjusts legend text size
+        legend.title = element_text(size = 10.5),  # Adjusts legend title size
+        strip.text = element_text(size = 12))  # Adjusts facet label size
+
+```
+
+<br><br>
+
+## warming vs level III ecoregions
+
+```{r, message = FALSE, include=FALSE}
+library(sf)
+# read in ecoregions shapefile
+eco.sf <- suppressMessages(st_read("ecoregions_shp"))
+
+# transform primary df to sf object
+df.sf <- st_as_sf(df, coords = c("Longitude", "Latitude"), crs = 4326)
+
+# convert to same crs as ecoregions
+df.sf <- st_transform(df.sf, crs = st_crs(eco.sf))
+
+# spatial join ecoregions to reservoir data 
+eco.sf <- eco.sf %>%
+  select(US_L3CODE, US_L3NAME, geometry)
+ecoregions.df <- st_join(df.sf, eco.sf)
+
+
+unique(ecoregions.df$US_L3NAME)
+
+```
+
+```{r, fig.height=6.5}
+# bar charts
+p <- ecoregions.df %>%
+  group_by(US_L3NAME, Month) %>%
+  summarize(mean_anomaly = mean(model_slope))
+
+ ggplot(p, aes(x = US_L3NAME, y = mean_anomaly, fill = US_L3NAME)) +
+  geom_bar(stat = "identity", position = position_dodge(), alpha = .8) +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Mean Warming Anomaly by Ecoregion and Month",
+       x = "Ecoregion",
+       y = "Mean Warming Anomaly",
+       fill = "Ecoregion") +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  theme(axis.text.x = element_blank(),
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),  # Adjusts plot title size
+        axis.title = element_text(size = 14),  # Adjusts axis titles size
+        axis.text = element_text(size = 11.5),  # Adjusts axis text size
+        legend.text = element_text(size = 9.5),  # Adjusts legend text size
+        legend.title = element_text(size = 10.5, face="bold"),  # Adjusts legend title size
+        strip.text = element_text(size = 12))  # Adjusts facet label size
+```
+
+<br>
+```{r, fig.height=7.5}
+ 
+# box plots
+ ggplot(ecoregions.df, aes(x = US_L3NAME, y = model_slope, fill = US_L3NAME)) +
+  geom_boxplot(alpha = .8) +
+  facet_wrap(~factor(Month), scales = "fixed") +
+  labs(title = "Variation in Warming Rates by Month",
+       x = "Ecoregion",
+       y = "T Trend (C/y)",
+       fill = "Ecoregion") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(),
+        legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),  # Adjusts plot title size
+        axis.title = element_text(size = 14),  # Adjusts axis titles size
+        axis.text = element_text(size = 11.5),  # Adjusts axis text size
+        legend.text = element_text(size = 9.5),  # Adjusts legend text size
+        legend.title = element_text(size = 10.5, face="bold"),  # Adjusts legend title size
+        strip.text = element_text(size = 12))  # Adjusts facet label size
+
+
+
+```
+<br><br>
+
+## warming vs profile depth
+
+```{r `vs profile depth`, fig.height = 6.5}
+ggplot() +
+  geom_point(data = df,
+             aes(x = max.depth, y = model_slope,
+                 shape = trend), alpha = .6, size = 2) +
+  geom_smooth(data = df, aes(x = max.depth,  y = model_slope),
+              method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = "Warming Rates vs. Max Profile Depth",
+       x = "Max Profile Depth (m)",
+       y = "T Trend (C/y)") +  
+  scale_shape_manual(values = c(1, 16, 10)) +
+  theme_minimal() + 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),  # Adjusts plot title size
+        axis.title = element_text(size = 14),  # Adjusts axis titles size
+        axis.text = element_text(size = 11.5),  # Adjusts axis text size
+        legend.text = element_text(size = 9.5),  # Adjusts legend text size
+        legend.title = element_text(size = 10.5),  # Adjusts legend title size
+        strip.text = element_text(size = 12))  # Adjusts facet label size
+
+```
+<br><br>
+
+## variation in warming rate, by month
+
+```{r `warming variation box plot`}
+ggplot(df, aes(x = Month, y = model_slope, fill = Month)) +
+  geom_boxplot(alpha = .85) +
+  labs(title = "Variation in Warming Rates by Month",
+       x = "Month",
+       y = "T Trend (C/y)",
+       fill = "Month") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(margin = margin(t = 10)),
+        legend.position = "none")
+```
+<br><br>
+
+## 	Roanoke River (station 4AROA038.49)
+
+mblm regressions by month for Roanoke River station, the only monitoring station where data collection began prior to 1970.
+
+<br>
+
+```{r `longest monitored site`}
+#Lastly, we have one site where monitoring began before 1970.  Could you make plots of anomaly vs. year with mblm regressions for the 6 months (and show the slope and p value on the plot)?
+
+# this code is copied and adapted from the initial dataPrep.rmd file. Refer to that for more thorough annotation
+
+ pre70 <- df.merged %>%
+  filter(FDT_STA_ID == "4AROA038.49")
+
+    pre70$Date <- pre70$Date * 86400      # 86400 = seconds in a day.
+    pre70$Date <- as.POSIXct(pre70$Date, origin = "1899-12-30", tz = "UTC")
+
+    pre70 <- pre70 %>%
+              mutate(MonthNum = lubridate::month(Date),
+                     Month = month.name[MonthNum]) %>%  
+              filter(FDT_STA_ID == "4AROA038.49" ) %>%
+              filter(MonthNum %in% 5:10) 
+        
+    pre70_summary <- pre70 %>%
+        group_by(FDT_STA_ID, MonthNum) %>%
+        summarize(Mean = mean(TMax, na.rm = TRUE),
+            Min = min(TMax, na.rm = TRUE),
+            Max = max(TMax, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop')
+    
+
+pre70 <- pre70 %>%
+  left_join(pre70_summary, by = c("FDT_STA_ID", "MonthNum")) %>%
+  mutate(TAnomaly = TMax - Mean)
+
+
+pre70$Year <- lubridate::year(pre70$Date)
+
+# remove NA values -- mblm() does not handle NA as lm() does
+pre70 <- pre70 %>%
+  filter(!is.na(TAnomaly))
+
+# create list to store regression results
+modelSummaries <- list()
+
+  for (month_num in 5:10) {
+    
+    month_station <- pre70 %>%
+      filter(MonthNum == month_num)
+
+      model <- mblm::mblm(TAnomaly ~ Year, data = month_station)
+      mod.sum <- mblm::summary.mblm(model)
+      
+      # store results
+      modelSummaries[[month.name[month_num]]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4]
+        )
+  }
+
+ #---
+
+pre70_summary <- pre70_summary %>%
+  mutate( model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA)
+
+for (i in 1:nrow(pre70_summary)) {
+  month = month.name[as.integer(pre70_summary[i, "MonthNum"])]
+  
+  pre70_summary$model_slope[i] <-  modelSummaries[[month]]$slope
+   pre70_summary$model_MAD[i] <-  modelSummaries[[month]]$MAD
+    pre70_summary$model_pval[i] <-  modelSummaries[[month]]$pvalue
+  
+}
+
+```
+
+```{r `plot for pre-70 station`}
+# refer to UVA statlab page for plotting CI with mblm regression via bootstrapping
+
+# calculate mblm for each month and store intercepts and slopes
+mblm_fits <- pre70 %>%
+  group_by(Month) %>%
+  do(model = mblm::mblm(TAnomaly ~ Year, data = .)) %>%
+  summarise(intercept = coef(model)[1], 
+            slope = coef(model)[2], 
+            "p val" = mblm::summary.mblm(model)$coefficients[2,4], 
+            Month = first(Month)) %>%
+  mutate(Month = factor(Month))
+
+# create df to use for plotting
+plottingData <- merge(pre70, mblm_fits, by = "Month")
+
+plottingData <- plottingData %>%
+  mutate(Month = factor(Month, levels = c("May", "June", "July", "August", "September", "October")))
+  
+
+# create labels and df to use for adding slope/pval to plots
+my_labels <- c()
+
+for (month in month.name[5:10]) {
+  my_labels <- c(my_labels, mblm_fits %>%
+                   filter(Month == month) %>%
+                   summarise(label = paste("Slope=", round(slope, 3), "\np-value=", round(`p val`, 4))) %>%
+                   pull(label))
+}
+
+annotation_data <- data.frame(
+  Month = factor(c("May", "June", "July", "August", "September", "October")),
+  x = c(1983,1985,1980, 1994, 1981.2, 1982.5), 
+  y = c(0.1, -4.5, 1.4, -4.1, -2.5, -6.2),  
+  label = my_labels)
+
+  
+ggplot(data = plottingData) +
+  geom_point(aes(x = Year, y = TAnomaly), alpha = .6, size = 2) +
+  geom_abline(aes(intercept = intercept, slope = slope), color = "blue", linewidth = 1) +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  geom_text(data = annotation_data, aes(x = x, y = y, label = label), 
+            size = 2.5,
+            color = "grey35",
+            hjust =0,
+            inherit.aes = FALSE) +
+  labs(title = "Warming Rates vs. Year, Roanoke River Station 4AROA038.49",
+       x = "Year",
+       y = "T Trend (C/y)") +  
+  scale_shape_manual(values = c(1, 16)) +
+  theme_minimal() + 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),  # Adjusts plot title size
+        axis.title = element_text(size = 14),  # Adjusts axis titles size
+        axis.text = element_text(size = 11.5),  # Adjusts axis text size
+        legend.text = element_text(size = 9.5),  # Adjusts legend text size
+        legend.title = element_text(size = 10.5),  # Adjusts legend title size
+        strip.text = element_text(size = 12))  # Adjusts facet label size
+
+```
+
+```{r, include = FALSE, eval = FALSE, echo = FALSE}
+# Paul's data to compare against
+kerr <- readr::read_csv("kerr_tanomaly.csv")
+
+kerr.paul <- kerr %>%
+  mutate(Date = mdy(Date)) %>%
+  select(`Mean Tmax`, TMean, 'Tmax Anom', Date) %>%
+  filter(month(Date) %in% c(5:10))
+
+any(is.na(kerr$`Tmax Anom`)) # no NA values
+
+# -- Review data on my end
+
+kerr.mine <- subset.df %>%
+  filter(FDT_STA_ID == kerr$FDT_STA_ID[1]) %>%
+  select(Date, TMax, TMean, TAnomaly)
+
+p <- kerr.mine %>%
+  left_join(kerr.paul, by = "Date")
+
+p <- p %>%
+  mutate(TAnomaly = round(TAnomaly, 1))
+
+problemIndices <- which(p$TAnomaly != p$`Tmax Anom`)
+
+p
+
+
+```
+
+
+
+
+
+
