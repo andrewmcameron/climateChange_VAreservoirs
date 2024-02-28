@@ -65,7 +65,7 @@ cols_to_keep <- colnames(subset.df)
 subset.df <- subset.df %>%
   left_join(monthlyStation_stats, by = c("FDT_STA_ID", "MonthNum")) %>%
   select(cols_to_keep, Mean) %>%
-  mutate(TAnomaly = TMax - Mean)  ## !!! I had originally written as ` TAnomaly = TMean - Mean`  
+  mutate(TAnomaly = TMax - Mean)  
 
 ```
 
