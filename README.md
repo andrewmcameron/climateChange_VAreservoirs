@@ -2,7 +2,7 @@
 
 ![](path_to_related_image.gif)
 
-A project focused on the application of Median-Based Linear Models (MBLM), using `mblm` package in R, to understand warming rates over time.
+A project focused on the application of Median-Based Linear Models (MBLM), using `mblm` package in R, to understand water surface temperature warming rates over time in reservoirs across the state of Virginia.
 
 # Summary
 
