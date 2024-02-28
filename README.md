@@ -22,7 +22,7 @@ This repository includes the following files and directories:
 | ecoregions_shp/                     | folder containg shapefile of Virginia Level III ecoregions (source: EPA)|
 | TempDO_climateChange_analysis.Rmd  | R Markdown file for data preparation in climate change analysis, includes fix for TAnomaly calculation.|
 | TempDO_climateChange_viz.Rmd  | R Markdown file for data analysis and viz|
-| VADEQ_stationInfo.csv              | VA DEQ (Department of Environmental Quality) station information |
+| VADEQ_stationInfo.csv              | VA DEQ station information |
 | data_original.xlsx                 | source data|
 | reservoir-temp-DO.Rproj            | R Project file |
 | .gitignore                        |  .gitignore                                                                   |
