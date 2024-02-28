@@ -1,6 +1,6 @@
 # Assessing the Effects of Climate Change in VA Reservoirs
 
-<img src="img/boxplot.png" width="400" height="300">
+<img src="img/boxplot.png" width="672" height="480">
 
 A project focused on the application of Median-Based Linear Models (MBLM), using `mblm` package in R, to understand water surface temperature warming rates over time in reservoirs across the state of Virginia.
 
