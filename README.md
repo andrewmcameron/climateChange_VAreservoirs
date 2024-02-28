@@ -26,3 +26,11 @@ This repository includes the following files and directories:
 | data_original.xlsx                 | source data|
 | reservoir-temp-DO.Rproj            | R Project file |
 | .gitignore                        |  .gitignore                                                                   |
+
+## Requirements
+
+The following libraries are required:
+* `tidyverse`
+* `mblm`
+* `ggplot2`
+* `sf` (to associate reservoirs with level 3 ecoregions)
