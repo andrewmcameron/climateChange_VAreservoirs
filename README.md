@@ -25,4 +25,4 @@ This repository includes the following files and directories:
 | VADEQ_stationInfo.csv              | VA DEQ (Department of Environmental Quality) station information |
 | data_original.xlsx                 | source data|
 | reservoir-temp-DO.Rproj            | R Project file |
-| .gitignore                        |                                                                            |
+| .gitignore                        |  .gitignore                                                                   |
