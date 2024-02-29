@@ -2,11 +2,11 @@
 
 <img src="img/boxplot.png" width="672" height="480">
 
-A project focused on the application of Median-Based Linear Models (MBLM), using `mblm` package in R, to understand water surface temperature warming rates over time in reservoirs across the state of Virginia.
+A project focused on the application of Median-Based Linear Models (MBLM), using `mblm` package in R, to understand water surface temperature warming rates over time in reservoirs across the state of Virginia. Work completed in collaboration with [Dr. Paul Bukaveckas](https://blogs.vcu.edu/pabukaveckas/) of VCU's Center for Environmental Sudies.
 
 # Summary
 
-The analysis uses long-term monitoring data from the Virginia Department of Environmental Quality to examine trends across 41 monitoring stations in reservoirs throughout the state of Virginia during the months of May-October. Median-based linear modelling is thought to be more robust to the presence of outlier data points than ordinary least squares linear regression.
+The analysis uses long-term monitoring data from the Virginia Department of Environmental Quality to examine trends across 41 monitoring stations in reservoirs throughout the state of Virginia during the months of May-October. Median-based linear modelling was used because it is believed to be more robust to the presence of outlier data points than ordinary least squares linear regression.
 Lake stations were selected that had at least 100 depth profiles recorded over the last 40+ years, with the earliest observations in the dataset coming from 1968.
 
 After subsetting data for the 41 selected lake stations from the larger DEQ dataset, mean, minimum, maximum, and the number of observations for maximum temperature (`TMax`) are derived for each station-month (41 sites x 6 months = 246 station-months), aggregating across all available years.
@@ -26,3 +26,11 @@ This repository includes the following files and directories:
 | data_original.xlsx                 | source data|
 | reservoir-temp-DO.Rproj            | R Project file |
 | .gitignore                        |  .gitignore                                                                   |
+
+## Requirements
+
+The following libraries are required:
+* `tidyverse`
+* `mblm`
+* `ggplot2`
+* `sf` (to associate reservoirs with level 3 ecoregions)
