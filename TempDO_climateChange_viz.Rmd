@@ -323,11 +323,11 @@ ggplot() +
 
 ```{r `warming variation box plot`}
 # this plot theme specifically set for export; requested by Paul for use in presentation
-mytitle <- "Variation in Warming Rates by Month"
+mytitle <- "Variation in Reservoir Warming Rates (C/y)"
 
 ggplot(df, aes(x = Month, y = model_slope, fill = Month)) +
   geom_boxplot(alpha = .8) +
-  labs(title = NULL,
+  labs(title = mytitle,
        x = "Month",
        y = "T Trend (C/y)",
        fill = "Month") +
@@ -337,15 +337,16 @@ ggplot(df, aes(x = Month, y = model_slope, fill = Month)) +
   #scale_fill_manual(values = c("#DBFE87", "#B24C63", "#FFE381", "#6699CC")) + 
   theme(axis.title.x = element_text(margin = margin(t = 15)),
         axis.title.y = element_text(margin = margin(r = 15)),
-        axis.title = element_text(size = 90, family = "titlefont"),
+        axis.title = element_text(size = 80, family = "titlefont"),
         axis.text = element_text(size = 55, family = "font2", color = "grey30"),
-        plot.title = element_text(size = 100, family = "titlefont", margin = margin(b = 15)),
+        plot.title = element_text(size = 90, family = "titlefont", margin = margin(b = 15)),
         plot.subtitle = element_text(size = 90, family = "titlefont", margin = margin(b = 15)),
         legend.position = "none",
-        panel.border = element_rect(color = "grey30", fill = NA, linewidth = 1.2))
+        panel.border = element_rect(color = "grey30", fill = NA, linewidth = 1.2),
+        plot.margin = unit(c(1,2,1,1), "cm"))
 
 
-# ggsave("variation_byMonth.jpg", width = 12, height = 8, dpi =300)
+ ggsave("variation_byMonth.jpg", width = 12, height = 8, dpi =300)
 
 ```
 <br><br>
