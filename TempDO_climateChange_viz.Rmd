@@ -263,7 +263,11 @@ p <- ecoregions.df %>%
 ```
 
 <br>
-```{r, fig.height=7.5}
+```{r}
+library(showtext)
+font_add_google(name = "Encode Sans SC", family = "titlefont")
+font_add_google(name = "Roboto", family = "font2")
+showtext_auto()
  
 # box plots
  ggplot(ecoregions.df, aes(x = US_L3NAME, y = model_slope, fill = US_L3NAME)) +
@@ -283,7 +287,6 @@ p <- ecoregions.df %>%
         legend.text = element_text(size = 9.5),  # Adjusts legend text size
         legend.title = element_text(size = 10.5, face="bold"),  # Adjusts legend title size
         strip.text = element_text(size = 12))  # Adjusts facet label size
-
 
 
 ```
@@ -319,15 +322,31 @@ ggplot() +
 ## variation in warming rate, by month
 
 ```{r `warming variation box plot`}
+# this plot theme specifically set for export; requested by Paul for use in presentation
+mytitle <- "Variation in Warming Rates by Month"
+
 ggplot(df, aes(x = Month, y = model_slope, fill = Month)) +
-  geom_boxplot(alpha = .85) +
-  labs(title = "Variation in Warming Rates by Month",
+  geom_boxplot(alpha = .8) +
+  labs(title = NULL,
        x = "Month",
        y = "T Trend (C/y)",
        fill = "Month") +
   theme_minimal() +
-  theme(axis.title.x = element_text(margin = margin(t = 10)),
-        legend.position = "none")
+  theme_minimal() +
+  scale_y_continuous(limits = c(-.1, .25)) + 
+  #scale_fill_manual(values = c("#DBFE87", "#B24C63", "#FFE381", "#6699CC")) + 
+  theme(axis.title.x = element_text(margin = margin(t = 15)),
+        axis.title.y = element_text(margin = margin(r = 15)),
+        axis.title = element_text(size = 90, family = "titlefont"),
+        axis.text = element_text(size = 55, family = "font2", color = "grey30"),
+        plot.title = element_text(size = 100, family = "titlefont", margin = margin(b = 15)),
+        plot.subtitle = element_text(size = 90, family = "titlefont", margin = margin(b = 15)),
+        legend.position = "none",
+        panel.border = element_rect(color = "grey30", fill = NA, linewidth = 1.2))
+
+
+# ggsave("variation_byMonth.jpg", width = 12, height = 8, dpi =300)
+
 ```
 <br><br>
 
