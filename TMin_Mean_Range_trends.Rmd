@@ -1,0 +1,417 @@
+---
+title: "Assessing Climate Change Effects in VA Reservoirs"
+subtitle: "Part 2: Deriving Trends for Temperature Min, Mean and Range"
+author: "Andrew Cameron"
+date: "2024-03-03"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+
+```
+
+## Data Preprocessing 
+
+```{r `read in data`}
+trendSites.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
+allData.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3)
+
+# Convert `date` column from Excel encoded date to a more legible date format. Otherwise date shows as numeric value, e.g. '44230'.
+    allData.df$Date <- allData.df$Date * 86400      # 86400 = seconds in a day.
+    allData.df$Date <- as.POSIXct(allData.df$Date, origin = "1899-12-30", tz = "UTC")
+    
+```
+
+```{r 'remove anomlies'}
+# a surface temperature (Tmax) of 2.8 C in August
+# 13774 	6ACNR000.00 	8/28/1990 	0.3 	NA 	NA 	NA 	NA
+
+which(grepl("13774", allData.df$X1))
+allData.df[13770, (5:8)] <- NA
+
+```
+
+```{r `subset and filter data`}
+# filter for rows corresponding to the 41 stations
+station_IDS <- trendSites.df$FDT_STA_ID
+subset.df <- allData.df %>%
+  mutate(MonthNum = lubridate::month(Date),
+         Year = lubridate::year(Date)) %>%  
+  filter(FDT_STA_ID %in% station_IDS) %>%
+  filter(MonthNum %in% 5:10) %>%
+  filter(MaxDepth.x >= .8*MedDepth)
+
+# `subset.df` = every date for all 41 trend sitesco
+
+```
+
+## Minimum temperature trend
+
+```{r `derive TMin Anomaly`}
+monthly_Tmin <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(Mean = mean(TMin, na.rm = TRUE),
+            Min = min(TMin, na.rm = TRUE),
+            Max = max(TMin, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop') %>%
+  mutate(Month = month.name[MonthNum])
+
+# write_csv(monthly_Tmin, "TMin_stats_monthlyByStation.csv")
+
+cols_to_keep <- colnames(subset.df)
+
+df.Tmin <- subset.df %>%
+  left_join(monthly_Tmin, by = c("FDT_STA_ID", "MonthNum")) %>%
+  select(cols_to_keep, Mean) %>%
+  mutate(TAnomaly = TMin - Mean)  
+
+```
+
+```{r `fit regressions for each month-station`}
+# fit a linear regression for anomaly values vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
+
+# install.packages("mblm")
+library(mblm)
+
+#Usage
+#mblm(formula, dataframe, repeated = TRUE)
+  #Arguments
+    #formula A formula of type y ~ x (only linear models are accepted)
+    #dataframe Optional dataframe
+    #repeated If set to true, model is computed using repeated medians. If false, a single median estimators are calculated
+
+# remove NA values -- mblm() does not handle NA as lm() does
+df.Tmin <- df.Tmin %>%
+  filter(!is.na(TAnomaly))
+
+# create list to store regression results
+modelSummaries <- list()
+
+for (station_id in unique(df.Tmin$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- df.Tmin %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(TAnomaly ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4]
+        )
+  }
+}
+
+# mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+monthly_Tmin <- monthly_Tmin %>%
+  mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA)
+
+for (i in 1:nrow(monthly_Tmin)) {
+  key = monthly_Tmin$key[i]
+  
+  monthly_Tmin$model_slope[i] <-  modelSummaries[[key]]$slope
+   monthly_Tmin$model_MAD[i] <-  modelSummaries[[key]]$MAD
+    monthly_Tmin$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  
+}
+
+
+monthly_Tmin %>%
+  select(-key) -> Tmin_final
+
+write_csv(Tmin_final, "output_data/TMin_mblmModelStatistics.csv")
+```
+
+
+## Mean Temperature Trend
+
+```{r `derive TMean Anomaly`}
+monthly_TMean <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(Mean = mean(TMean, na.rm = TRUE),
+            Min = min(TMean, na.rm = TRUE),
+            Max = max(TMean, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop') %>%
+  mutate(Month = month.name[MonthNum])
+
+# write_csv(monthly_TMean, "TMean_stats_monthlyByStation.csv")
+
+cols_to_keep <- colnames(subset.df)
+
+df.TMean <- subset.df %>%
+  left_join(monthly_TMean, by = c("FDT_STA_ID", "MonthNum")) %>%
+  select(cols_to_keep, Mean) %>%
+  mutate(TAnomaly = TMean - Mean)  
+
+```
+
+```{r `fit regressions for each month-station2`}
+# fit a linear regression for anomaly values vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
+
+# install.packages("mblm")
+library(mblm)
+
+#Usage
+#mblm(formula, dataframe, repeated = TRUE)
+  #Arguments
+    #formula A formula of type y ~ x (only linear models are accepted)
+    #dataframe Optional dataframe
+    #repeated If set to true, model is computed using repeated medians. If false, a single median estimators are calculated
+
+# remove NA values -- mblm() does not handle NA as lm() does
+df.TMean <- df.TMean %>%
+  filter(!is.na(TAnomaly))
+
+# create list to store regression results
+modelSummaries <- list()
+
+for (station_id in unique(df.TMean$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- df.TMean %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(TAnomaly ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4]
+        )
+  }
+}
+
+# mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
+
+```
+
+
+```{r `add reg stats to summary df2`}
+# create station-month key
+monthly_TMean <- monthly_TMean %>%
+  mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA)
+
+for (i in 1:nrow(monthly_TMean)) {
+  key = monthly_TMean$key[i]
+  
+  monthly_TMean$model_slope[i] <-  modelSummaries[[key]]$slope
+   monthly_TMean$model_MAD[i] <-  modelSummaries[[key]]$MAD
+    monthly_TMean$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  
+}
+
+
+monthly_TMean %>%
+  select(-key) -> TMean_final
+
+write_csv(TMean_final, "output_data/TMean_mblmModelStatistics.csv")
+```
+
+
+## Temperature Range Trend
+
+```{r `derive TRange mean by month`}
+monthly_TRange <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(Mean = mean(TRange, na.rm = TRUE),
+            Min = min(TRange, na.rm = TRUE),
+            Max = max(TRange, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop') %>%
+  mutate(Month = month.name[MonthNum])
+
+cols_to_keep <- colnames(subset.df)
+
+df.TRange <- subset.df %>%
+  left_join(monthly_TRange, by = c("FDT_STA_ID", "MonthNum")) %>%
+  select(cols_to_keep, Mean) 
+
+```
+
+```{r `fit regressions for each month-station`}
+# fit a linear regression for TRange vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
+
+# install.packages("mblm")
+library(mblm)
+
+#Usage
+#mblm(formula, dataframe, repeated = TRUE)
+  #Arguments
+    #formula A formula of type y ~ x (only linear models are accepted)
+    #dataframe Optional dataframe
+    #repeated If set to true, model is computed using repeated medians. If false, a single median estimators are calculated
+
+# remove NA values -- mblm() does not handle NA as lm() does
+df.TRange <- df.TRange %>%
+  filter(!is.na(TRange))
+
+# create list to store regression results
+modelSummaries <- list()
+
+for (station_id in unique(df.TRange$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- df.TRange %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(TRange ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4]
+        )
+  }
+}
+
+# mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+monthly_TRange <- monthly_TRange %>%
+  mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA)
+
+for (i in 1:nrow(monthly_TRange)) {
+  key = monthly_TRange$key[i]
+  
+  monthly_TRange$model_slope[i] <-  modelSummaries[[key]]$slope
+   monthly_TRange$model_MAD[i] <-  modelSummaries[[key]]$MAD
+    monthly_TRange$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  
+}
+
+
+monthly_TRange %>%
+  select(-key) -> TRange_final
+
+write_csv(TRange_final, "output_data/TRange_mblmModelStatistics.csv")
+```
+
+
+
+## Data viz
+
+"a box-whisker plot showing the distribution of values by month across all stations."
+
+```{r `custom func`}
+# custom function to prepare plotting data for each variable
+makePlotData <- function(df) {
+
+# derive mean warming and incorporate back into df for plotting
+df.allMonths <- df %>%
+  group_by(FDT_STA_ID) %>%
+  summarize(mean_slope = mean(model_slope, na.rm = TRUE),
+            .groups = "drop") %>%
+  mutate(Month = "All Months",
+         trend= "N/A")
+
+df.plot <- bind_rows(df, df.allMonths)
+
+# populate model slope column with mean slope where Month == "All Months"
+df.plot <- df.plot %>%
+  mutate(model_slope = if_else(Month == "All Months", mean_slope, model_slope))
+
+
+# set month as factor
+df.plot <- df.plot %>%
+  mutate(Month = factor(Month, levels = c("January", "February", "March", 
+                                          "April", "May", "June", "July", 
+                                          "August", "September", "October", 
+                                          "November", "December", "All Months")),
+         trend = ifelse(is.na(df.plot$model_pval), "N/A",
+                        ifelse(df.plot$model_pval <= 0.05, "significant", "not significant")))
+
+df.plot$trend <- factor(df.plot$trend, levels = c("significant", "not significant", "N/A"))
+
+return(df.plot)
+
+}
+
+```
+
+### TMin
+
+```{r}
+TMin_plot.df <- makePlotData(Tmin_final)
+
+ggplot(TMin_plot.df, aes(x = Month, y = model_slope, fill = Month)) +
+  geom_boxplot(alpha = .85) +
+  labs(title = "Variation in Warming Rates by Month (TMin)",
+       x = "Month",
+       y = "T Trend (C/y)",
+       fill = "Month") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(margin = margin(t = 10)),
+        legend.position = "none")
+
+ggsave("output_data/TMin_variationByMonth.jpg")
+
+```
+
+### TMean
+
+```{r}
+TMean_plot.df <- makePlotData(TMean_final)
+
+ggplot(TMean_plot.df, aes(x = Month, y = model_slope, fill = Month)) +
+  geom_boxplot(alpha = .85) +
+  labs(title = "Variation in Warming Rates by Month (TMean)",
+       x = "Month",
+       y = "T Trend (C/y)",
+       fill = "Month") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(margin = margin(t = 10)),
+        legend.position = "none")
+
+ggsave("output_data/TMean_variationByMonth.jpg")
+
+```
+
+### TRange
+
+```{r}
+TRange_plot.df <- makePlotData(TRange_final)
+
+ggplot(TRange_plot.df, aes(x = Month, y = model_slope, fill = Month)) +
+  geom_boxplot(alpha = .85) +
+  labs(title = "Variation in Warming Rates by Month (TRange)",
+       x = "Month",
+       y = "T Trend (C/y)",
+       fill = "Month") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(margin = margin(t = 10)),
+        legend.position = "none")
+
+ggsave("output_data/TRange_variationByMonth.jpg")
+
+```

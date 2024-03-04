@@ -329,6 +329,7 @@ ggplot(df, aes(x = Month, y = model_slope, fill = Month)) +
   theme(axis.title.x = element_text(margin = margin(t = 10)),
         legend.position = "none")
 ```
+
 <br><br>
 
 ## 	Roanoke River (station 4AROA038.49)
@@ -474,32 +475,19 @@ ggplot(data = plottingData) +
 ```
 
 ```{r, include = FALSE, eval = FALSE, echo = FALSE}
-# Paul's data to compare against
-kerr <- readr::read_csv("kerr_tanomaly.csv")
+ggplot(df, aes(x = Month, y = model_slope, fill = Month)) +
+  geom_boxplot(alpha = .85) +
+  labs(title = "Variation in Warming Rates by Month",
+       x = "Month",
+       y = "T Trend (C/y)",
+       fill = "Month") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(margin = margin(t = 10)),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 15),
+        legend.position = "none")
 
-kerr.paul <- kerr %>%
-  mutate(Date = mdy(Date)) %>%
-  select(`Mean Tmax`, TMean, 'Tmax Anom', Date) %>%
-  filter(month(Date) %in% c(5:10))
-
-any(is.na(kerr$`Tmax Anom`)) # no NA values
-
-# -- Review data on my end
-
-kerr.mine <- subset.df %>%
-  filter(FDT_STA_ID == kerr$FDT_STA_ID[1]) %>%
-  select(Date, TMax, TMean, TAnomaly)
-
-p <- kerr.mine %>%
-  left_join(kerr.paul, by = "Date")
-
-p <- p %>%
-  mutate(TAnomaly = round(TAnomaly, 1))
-
-problemIndices <- which(p$TAnomaly != p$`Tmax Anom`)
-
-p
-
+ggsave("boxplot.jpg")
 
 ```
 
