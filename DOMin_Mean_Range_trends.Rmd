@@ -1,0 +1,575 @@
+---
+title: "Assessing Climate Change Effects in VA Reservoirs"
+author: "Part 3: Deriving Trends for Dissolved Oxygen Min, Mean, Range"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
+
+```{r `read in and subset data`}
+trendSites.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
+allData.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3)
+
+# Convert `date` column from Excel encoded date to a more legible date format. Otherwise date shows as numeric value, e.g. '44230'.
+    allData.df$Date <- allData.df$Date * 86400      # 86400 = seconds in a day.
+    allData.df$Date <- as.POSIXct(allData.df$Date, origin = "1899-12-30", tz = "UTC")
+
+# filter for rows corresponding to the 41 stations
+station_IDS <- trendSites.df$FDT_STA_ID
+subset.df <- allData.df %>%
+  mutate(MonthNum = lubridate::month(Date),
+         Year = lubridate::year(Date)) %>%  
+  filter(FDT_STA_ID %in% station_IDS) %>%
+  filter(MonthNum %in% 5:10) %>%
+  filter(!FDT_STA_ID == "6ACNR000.00" & !FDT_STA_ID == "6APNR008.15")  # these two stations lack DO data for all obs
+
+    
+# "add a filter excluding trend results for profiles where NObs<10 (I count there are ~7 of these)"
+# applying this filter to the df for deriving trends (`subset.df`) complicates the code substantially because it results in there not being a corresponding MonthNum 5:10 for each station ID. Filter applied after the trends are derived but before plotting. 
+countPerGroup <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarise(Nobs = n()) %>%
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_"))
+
+insufficient_Nobs <- countPerGroup %>%
+  filter(Nobs < 10)
+
+insufficient_Nobs <- insufficient_Nobs$key
+
+```
+ 
+## Minimum Dissovled Oxygen
+
+```{r `derive DOMin by month` }
+monthlyDOMin <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(Mean = mean(DOMin, na.rm = TRUE),
+            Min = min(DOMin, na.rm = TRUE),
+            Max = max(DOMin, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop') %>%
+  mutate(Month = month.name[MonthNum])
+
+ # write_csv(monthlyDOMin, "output_data/DOMin_stats_monthlyByStation.csv")
+
+cols_to_keep <- colnames(subset.df)
+
+df.DOMin <- subset.df %>%
+  left_join(monthlyDOMin, by = c("FDT_STA_ID", "MonthNum")) %>%
+  select(all_of(cols_to_keep), Mean) 
+
+```
+
+```{r `fit regressions for each month-station`, warning=TRUE}
+# fit a linear regression for DOMean vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
+
+# install.packages("mblm")
+library(mblm)
+
+#Usage
+#mblm(formula, dataframe, repeated = TRUE)
+  #Arguments
+    #formula A formula of type y ~ x (only linear models are accepted)
+    #dataframe Optional dataframe
+    #repeated If set to true, model is computed using repeated medians. If false, a single median estimators are calculated
+
+# remove NA values -- mblm() does not handle NA as lm() does
+df.DOMin <- df.DOMin %>%
+  filter(!is.na(DOMin))
+
+# create list to store regression results
+modelSummaries <- list()
+
+for (station_id in unique(df.DOMin$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- df.DOMin %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(DOMin ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4]
+        )
+  }
+}
+
+# mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+monthlyDOMin <- monthlyDOMin %>%
+  mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA)
+
+for (i in 1:nrow(monthlyDOMin)) {
+  key = monthlyDOMin$key[i]
+  
+  monthlyDOMin$model_slope[i] <-  modelSummaries[[key]]$slope
+   monthlyDOMin$model_MAD[i] <-  modelSummaries[[key]]$MAD
+    monthlyDOMin$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  
+}
+
+
+monthlyDOMin %>%
+  select(-key) -> DOMin_final
+
+write_csv(DOMin_final, "output_data/DOMin_mblmModelStatistics.csv")
+
+# do any month-stations return a 0 slope with sig pval? In this case, no
+wonky_results <- DOMin_final %>%
+  filter(model_slope == 0 & model_pval <= 0.05)
+
+paste(nrow(wonky_results), "station-months returned a slope of 0 with a significant p-value in DOMin trend analysis.", sep=" ")
+
+```
+
+## Maximum Dissovled Oxygen
+
+```{r `derive DOMax by month` }
+monthlyDOMax <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(Mean = mean(DOMax, na.rm = TRUE),
+            Min = min(DOMax, na.rm = TRUE),
+            Max = max(DOMax, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop') %>%
+  mutate(Month = month.name[MonthNum])
+
+ # write_csv(monthlyDOMax, "output_data/DOMax_stats_monthlyByStation.csv")
+
+cols_to_keep <- colnames(subset.df)
+
+df.DOMax <- subset.df %>%
+  left_join(monthlyDOMax, by = c("FDT_STA_ID", "MonthNum")) %>%
+  select(all_of(cols_to_keep), Mean) %>%
+  arrange(FDT_STA_ID, MonthNum)
+
+```
+
+```{r `fit regressions for each month-station`, warning=FALSE}
+# fit a linear regression for DOMean vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
+
+# install.packages("mblm")
+library(mblm)
+
+#Usage
+#mblm(formula, dataframe, repeated = TRUE)
+  #Arguments
+    #formula A formula of type y ~ x (only linear models are accepted)
+    #dataframe Optional dataframe
+    #repeated If set to true, model is computed using repeated medians. If false, a single median estimators are calculated
+
+# remove NA values -- mblm() does not handle NA as lm() does
+df.DOMax <- df.DOMax %>%
+  filter(!is.na(DOMax))
+
+# mblm returning warning 'unable to calculate precise p-values...' Are there in fact ties/non-unique vals among obs for a given station-month?
+DOMax_with.repeats <- df.DOMax %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(HasRepeats = if_else(n_distinct(DOMax) < n(), TRUE, FALSE),
+            UniqueDOMaxCount = n_distinct(DOMax),
+            TotalCount = n(),
+            .groups = 'drop') %>%
+  select(FDT_STA_ID, MonthNum, HasRepeats, UniqueDOMaxCount, TotalCount)
+
+
+# create list to store regression results
+modelSummaries <- list()
+
+for (station_id in unique(df.DOMax$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- df.DOMax %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(DOMax ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4]
+        )
+  }
+}
+
+# mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+monthlyDOMax <- monthlyDOMax %>%
+  mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA)
+
+for (i in 1:nrow(monthlyDOMax)) {
+  key = monthlyDOMax$key[i]
+  
+  monthlyDOMax$model_slope[i] <-  modelSummaries[[key]]$slope
+   monthlyDOMax$model_MAD[i] <-  modelSummaries[[key]]$MAD
+    monthlyDOMax$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  
+}
+
+
+monthlyDOMax %>%
+  select(-key) -> DOMax_final
+
+write_csv(DOMax_final, "output_data/DOMax_mblmModelStatistics.csv")
+
+# do any month-stations return a 0 slope with sig pval? In this case, no
+wonky_results <- DOMax_final %>%
+  filter(model_slope == 0 & model_pval <= 0.05)
+
+paste(nrow(wonky_results), "station-months returned a slope of 0 with a significant p-value in DOMax trend analysis.", sep=" ")
+
+```
+
+## Mean Dissovled Oxygen
+
+```{r `derive DOMean by month` }
+monthlyDOMean <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(Mean = mean(DOMean, na.rm = TRUE),
+            Min = min(DOMean, na.rm = TRUE),
+            Max = max(DOMean, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop') %>%
+  mutate(Month = month.name[MonthNum])
+
+ # write_csv(monthlyDOMean, "output_data/DOMean_stats_monthlyByStation.csv")
+
+cols_to_keep <- colnames(subset.df)
+
+df.DOMean <- subset.df %>%
+  left_join(monthlyDOMean, by = c("FDT_STA_ID", "MonthNum")) %>%
+  select(all_of(cols_to_keep), Mean)
+```
+
+```{r `fit regressions for each month-station`, warning = TRUE}
+# fit a linear regression for DOMean vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
+
+# install.packages("mblm")
+library(mblm)
+
+#Usage
+#mblm(formula, dataframe, repeated = TRUE)
+  #Arguments
+    #formula A formula of type y ~ x (only linear models are accepted)
+    #dataframe Optional dataframe
+    #repeated If set to true, model is computed using repeated medians. If false, a single median estimators are calculated
+
+# remove NA values -- mblm() does not handle NA as lm() does
+df.DOMean <- df.DOMean %>%
+  filter(!is.na(DOMean))
+
+DOMean_with.repeats <- df.DOMean %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(HasRepeats = if_else(n_distinct(DOMean) < n(), TRUE, FALSE),
+            UniqueDOMeanCount = n_distinct(DOMean),
+            TotalCount = n(),
+            .groups = 'drop') %>%
+  select(FDT_STA_ID, MonthNum, HasRepeats, UniqueDOMeanCount, TotalCount)
+
+write_csv(DOMean_with.repeats, "DOMean_uniqueValsPerGroup.csv")
+
+df.DOMean %>%
+  filter(FDT_STA_ID == "2-JKS044.60" & MonthNum == 5) %>%
+  arrange(DOMean)
+
+table(qq)
+
+# create list to store regression results
+modelSummaries <- list()
+
+for (station_id in unique(df.DOMean$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- df.DOMean %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(DOMean ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4]
+        )
+  }
+}
+
+# mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+monthlyDOMean <- monthlyDOMean %>%
+  mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA)
+
+for (i in 1:nrow(monthlyDOMean)) {
+  key = monthlyDOMean$key[i]
+  
+  monthlyDOMean$model_slope[i] <-  modelSummaries[[key]]$slope
+   monthlyDOMean$model_MAD[i] <-  modelSummaries[[key]]$MAD
+    monthlyDOMean$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  
+}
+
+
+monthlyDOMean %>%
+  select(-key) -> DOMean_final
+
+write_csv(DOMean_final, "output_data/DOMean_mblmModelStatistics.csv")
+
+# do any month-stations return a 0 slope with sig pval? In this case, no
+wonky_results <- DOMean_final %>%
+  filter(model_slope == 0 & model_pval <= 0.05)
+
+paste(nrow(wonky_results), "station-months returned a slope of 0 with a significant p-value in DOMean trend analysis.", sep=" ")
+
+```
+
+## Dissovled Oxygen Range
+
+```{r `derive DORange by month` }
+monthlyDORange <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(Mean = mean(DORange, na.rm = TRUE),
+            Min = min(DORange, na.rm = TRUE),
+            Max = max(DORange, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop') %>%
+  mutate(Month = month.name[MonthNum])
+
+ # write_csv(monthlyDORange, "output_data/DORange_stats_monthlyByStation.csv")
+
+cols_to_keep <- colnames(subset.df)
+
+df.DORange <- subset.df %>%
+  left_join(monthlyDORange, by = c("FDT_STA_ID", "MonthNum")) %>%
+  select(all_of(cols_to_keep), Mean)  
+
+```
+
+```{r `fit regressions for each month-station`, warning = FALSE}
+# fit a linear regression for DORange vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
+
+# install.packages("mblm")
+library(mblm)
+
+#Usage
+#mblm(formula, dataframe, repeated = TRUE)
+  #Arguments
+    #formula A formula of type y ~ x (only linear models are accepted)
+    #dataframe Optional dataframe
+    #repeated If set to true, model is computed using repeated medians. If false, a single median estimators are calculated
+
+# remove NA values -- mblm() does not handle NA as lm() does
+df.DORange <- df.DORange %>%
+  filter(!is.na(DORange))
+
+# create list to store regression results
+modelSummaries <- list()
+
+for (station_id in unique(df.DORange$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- df.DORange %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(DORange ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4]
+        )
+  }
+}
+
+# mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+monthlyDORange <- monthlyDORange %>%
+  mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA)
+
+for (i in 1:nrow(monthlyDORange)) {
+  key = monthlyDORange$key[i]
+  
+  monthlyDORange$model_slope[i] <-  modelSummaries[[key]]$slope
+   monthlyDORange$model_MAD[i] <-  modelSummaries[[key]]$MAD
+    monthlyDORange$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  
+}
+
+
+monthlyDORange %>%
+  select(-key) -> DORange_final
+
+write_csv(DORange_final, "output_data/DORange_mblmModelStatistics.csv")
+
+# do any month-stations return a 0 slope with sig pval? In this case, no
+wonky_results <- DORange_final %>%
+  filter(model_slope == 0 & model_pval <= 0.05)
+
+paste(nrow(wonky_results), "station-months returned a slope of 0 with a significant p-value in DORange trend analysis.", sep=" ")
+
+wonky_results
+```
+
+
+## Data viz
+
+"a box-whisker plot showing the distribution of values by month across all stations."
+
+```{r `custom func`}
+# custom function to prepare plotting data for each variable
+makePlotData <- function(df) {
+
+# derive mean warming and incorporate back into df for plotting
+df.allMonths <- df %>%
+  group_by(FDT_STA_ID) %>%
+  summarize(mean_slope = mean(model_slope, na.rm = TRUE),
+            .groups = "drop") %>%
+  mutate(Month = "All Months",
+         trend= "N/A")
+
+df.plot <- bind_rows(df, df.allMonths)
+
+# populate model slope column with mean slope where Month == "All Months"
+df.plot <- df.plot %>%
+  mutate(model_slope = if_else(Month == "All Months", mean_slope, model_slope))
+
+
+# set month as factor
+df.plot <- df.plot %>%
+  mutate(Month = factor(Month, levels = c("January", "February", "March", 
+                                          "April", "May", "June", "July", 
+                                          "August", "September", "October", 
+                                          "November", "December", "All Months")),
+         trend = ifelse(is.na(df.plot$model_pval), "N/A",
+                        ifelse(df.plot$model_pval <= 0.05, "significant", "not significant")))
+
+df.plot$trend <- factor(df.plot$trend, levels = c("significant", "not significant", "N/A"))
+
+return(df.plot)
+
+}
+
+```
+
+### DOMin
+
+```{r}
+DOMin_plot.df <- makePlotData(DOMin_final)
+
+ggplot(DOMin_plot.df, aes(x = Month, y = model_slope, fill = Month)) +
+  geom_boxplot(alpha = .85) +
+  labs(title = "Variation in Warming Rates by Month (DOMin)",
+       x = "Month",
+       y = "T Trend (C/y)",
+       fill = "Month") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(margin = margin(t = 10)),
+        legend.position = "none")
+
+ggsave("output_data/DOMin_variationByMonth.jpg")
+
+```
+
+
+### DOMax
+
+```{r}
+DOMax_plot.df <- makePlotData(DOMax_final)
+
+ggplot(DOMax_plot.df, aes(x = Month, y = model_slope, fill = Month)) +
+  geom_boxplot(alpha = .85) +
+  labs(title = "Variation in Warming Rates by Month (DOMax)",
+       x = "Month",
+       y = "T Trend (C/y)",
+       fill = "Month") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(margin = margin(t = 10)),
+        legend.position = "none")
+
+ggsave("output_data/DOMax_variationByMonth.jpg")
+
+```
+
+### DOMean
+
+```{r}
+DOMean_plot.df <- makePlotData(DOMean_final)
+
+ggplot(DOMean_plot.df, aes(x = Month, y = model_slope, fill = Month)) +
+  geom_boxplot(alpha = .85) +
+  labs(title = "Variation in Warming Rates by Month (DOMean)",
+       x = "Month",
+       y = "T Trend (C/y)",
+       fill = "Month") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(margin = margin(t = 10)),
+        legend.position = "none")
+
+ggsave("output_data/DOMean_variationByMonth.jpg")
+
+```
+
+### TRange
+
+```{r}
+DORange_plot.df <- makePlotData(DORange_final)
+
+ggplot(DORange_plot.df, aes(x = Month, y = model_slope, fill = Month)) +
+  geom_boxplot(alpha = .85) +
+  labs(title = "Variation in Warming Rates by Month (DORange)",
+       x = "Month",
+       y = "T Trend (C/y)",
+       fill = "Month") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(margin = margin(t = 10)),
+        legend.position = "none")
+
+ggsave("output_data/DORange_variationByMonth.jpg")
+
+```
+
+

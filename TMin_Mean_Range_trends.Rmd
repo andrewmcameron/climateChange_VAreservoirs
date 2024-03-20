@@ -2,7 +2,6 @@
 title: "Assessing Climate Change Effects in VA Reservoirs"
 subtitle: "Part 2: Deriving Trends for Temperature Min, Mean and Range"
 author: "Andrew Cameron"
-date: "2024-03-03"
 output: html_document
 ---
 
@@ -39,12 +38,50 @@ allData.df[13770, (5:8)] <- NA
 station_IDS <- trendSites.df$FDT_STA_ID
 subset.df <- allData.df %>%
   mutate(MonthNum = lubridate::month(Date),
-         Year = lubridate::year(Date)) %>%  
+         Year = lubridate::year(Date)) %>%
   filter(FDT_STA_ID %in% station_IDS) %>%
   filter(MonthNum %in% 5:10) %>%
   filter(MaxDepth.x >= .8*MedDepth)
 
-# `subset.df` = every date for all 41 trend sitesco
+
+# Paul discovered 5 sites that slipped the filter despite having incomplete profiles (median = .3, but only surface taken)
+# 2-XDD000.40, 4AROA192.55, 5ASRN000.66, 6ACNR000.00, and 6APNR008.1
+incomplete_profiles <- c("2-XDD000.40", "4AROA192.55", "5ASRN000.66", "6ACNR000.00", "6APNR008.15")
+subset.df <- subset.df %>%
+  filter(!FDT_STA_ID %in% incomplete_profiles)
+
+# We missed two other stations with large number of profiles where max depth = .3. I discovered this because the associated station-months resulted in slopes of 0 with sig pvals. Upon examining I discovered max == median & max == .3. Applied `  filter(!MaxDepth.x == MedDepth & !MaxDepth.x <= .3)` to remove these. 
+pval_issues <- c("4AROA038.49", "9-NEW098.32")
+pval_issues <- allData.df %>%
+  mutate(MonthNum = lubridate::month(Date),
+         Year = lubridate::year(Date)) %>% 
+  filter(FDT_STA_ID %in% pval_issues) %>%
+  filter(MonthNum %in% 5:10)
+
+depthfilters <- pval_issues %>%
+  filter(MaxDepth.x >= .8*MedDepth) %>%
+  filter(!MaxDepth.x == MedDepth & !MaxDepth.x <= .3)
+
+xx <- depthfilters %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(obs = n())  # all but one station-month still has the minimum 10 Nobs after applying filters
+
+subset.df <- subset.df %>%
+    filter(!MaxDepth.x == MedDepth & !MaxDepth.x <= .3)
+
+
+# "add a second filter excluding trend results for profiles where NObs<10 (I count there are ~7 of these)"
+# applying this filter to the df for deriving trends (`subset.df`) complicates the code substantially because it results in there not being a corresponding MonthNum 5:10 for each station ID. Filter applied after the trends are derived but before plotting. 
+
+countPerGroup <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarise(Nobs = n()) %>%
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_"))
+
+insufficient_Nobs <- countPerGroup %>%
+  filter(Nobs < 10)
+
+insufficient_Nobs <- insufficient_Nobs$key
 
 ```
 
@@ -68,6 +105,11 @@ df.Tmin <- subset.df %>%
   left_join(monthly_Tmin, by = c("FDT_STA_ID", "MonthNum")) %>%
   select(cols_to_keep, Mean) %>%
   mutate(TAnomaly = TMin - Mean)  
+
+# apply filter to exclude month-stations with < 10 Nobs from visualization
+monthly_Tmin <- monthly_Tmin %>%
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_")) %>%
+  filter(!key %in% insufficient_Nobs)
 
 ```
 
@@ -117,7 +159,7 @@ for (station_id in unique(df.Tmin$FDT_STA_ID)) {
 ```{r `add reg stats to summary df`}
 # create station-month key
 monthly_Tmin <- monthly_Tmin %>%
-  mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_"),
           model_slope = NA,
           model_MAD = NA,
           model_pval = NA)
@@ -159,6 +201,11 @@ df.TMean <- subset.df %>%
   left_join(monthly_TMean, by = c("FDT_STA_ID", "MonthNum")) %>%
   select(cols_to_keep, Mean) %>%
   mutate(TAnomaly = TMean - Mean)  
+
+# apply filter to exclude month-stations with < 10 Nobs from visualization
+monthly_TMean <- monthly_TMean %>%
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_")) %>%
+  filter(!key %in% insufficient_Nobs)
 
 ```
 
@@ -247,6 +294,11 @@ cols_to_keep <- colnames(subset.df)
 df.TRange <- subset.df %>%
   left_join(monthly_TRange, by = c("FDT_STA_ID", "MonthNum")) %>%
   select(cols_to_keep, Mean) 
+
+# apply filter to exclude month-stations with < 10 Nobs from visualization
+monthly_TRange <- monthly_TRange %>%
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_")) %>%
+  filter(!key %in% insufficient_Nobs)
 
 ```
 

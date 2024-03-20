@@ -1,7 +1,6 @@
 ---
 title: 'Spatial and Temporal Analysis of Reservoir Warming Trends: Assessing Geographic
   Gradients, Temporal Dynamics, and Regional Influences'
-date: "2024-02-21"
 output: 
   html_document:
     toc: TRUE
