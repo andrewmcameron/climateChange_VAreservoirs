@@ -1,0 +1,162 @@
+---
+title: "Trends vs Lake Depth"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyverse)
+
+```
+
+- make faceted trend vs lake depth plots for all the variables (T mean,min,max,range & DO min,mean,range).
+- use the revised station depth estimates from the attached file (on the second page (Trends Sites) in Column K is the station average max depth)
+- Note that for Tmax, the regression should contain 41 data points.
+- For the other variables, there will be ~34 or less (subtracting 7 stations that were excluded, plus a few others that were dropped due to too few data points).
+- It is helpful to code the individual trends based on whether they were significant (as you have below).
+
+```{r `derive/prepare plotting data`}
+# Create list containing trend results for each of the 7 variables
+files <- list.files("~/Desktop/Bukaveckas_WaterLab/climateChange_VAreservoirs/output_data")
+mblm_files <- files[grepl("mblmModel", files)]
+
+
+trends_list <- list()
+for (i in seq_along(mblm_files)) {
+  df <- read_csv(paste0("~/Desktop/Bukaveckas_WaterLab/climateChange_VAreservoirs/output_data", "/", mblm_files[i]))
+  
+  file_name_prefix <- sub("_(.*)", "", mblm_files[i])
+  
+  trends_list[[file_name_prefix]] <- df
+}
+
+
+# derive all months mean values and incorporate back into df for plotting
+trends_list <- lapply(trends_list, function(df) {
+  all_months_mean <- df %>%
+    group_by(FDT_STA_ID) %>%
+    summarize(mean_slope = mean(model_slope, na.rm = TRUE), .groups = "drop") %>%
+    mutate(Month = "All Months",
+           trend = "N/A")
+  
+  # Combine the original df with all months summary
+  combined_df <- bind_rows(df, all_months_mean)
+
+  # single column containing slopes (for use as y variable when plotting) -- currently "All Months" slopes are in their own column
+  combined_df <- combined_df %>%
+    mutate(model_slope = if_else(Month == "All Months", mean_slope, model_slope))
+  
+  # set month as factor and identify significant vs not significant trends
+  combined_df <- combined_df %>%
+    mutate(Month = factor(Month, levels = c("January", "February", "March", "April", 
+                                            "May", "June", "July", "August", "September", 
+                                            "October", "November", "December", "All Months")),
+          trend = ifelse(is.na(combined_df$model_pval), "N/A",
+                        ifelse(combined_df$model_pval <= 0.05, "significant", "not significant"))) 
+
+  combined_df$trend <- factor(combined_df$trend, levels = c("significant", "not significant", "N/A"))
+
+return(combined_df)
+})
+
+# incorporate site depths into dfs
+depths.df <- read_csv("stations_updatedDepths.csv")
+trends_list <- lapply(trends_list, function(df) {
+  df %>% 
+    left_join(depths.df, by = c("FDT_STA_ID" = "Stations")) %>%
+    rename(StationDepth = 'Station Depth')
+})
+
+# Create separate objects for each variable
+list2env(trends_list, envir = .GlobalEnv)
+
+```
+
+```{r `plotting function`, fig.height = 6.5}
+
+profileDepth_plots <- function(df, title = NULL, ylab = NULL) {
+plot <- ggplot() +
+  geom_point(data = df,
+             aes(x = StationDepth, y = model_slope,
+                 shape = trend), alpha = .6, size = 2) +
+  geom_smooth(data = df, aes(x = StationDepth,  y = model_slope),
+              method = "lm") +
+  facet_wrap(~factor(Month), scales = "free_y") +
+  labs(title = title,
+       x = "Mean Max Profile Depth (m)",
+       y = ylab) +  
+  scale_shape_manual(values = c(1, 16, 10)) +
+  theme_minimal() + 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),  # Adjusts plot title size
+        axis.title = element_text(size = 14),  # Adjusts axis titles size
+        axis.text = element_text(size = 11.5),  # Adjusts axis text size
+        legend.text = element_text(size = 9.5),  # Adjusts legend text size
+        legend.title = element_text(size = 10.5),  # Adjusts legend title size
+        strip.text = element_text(size = 12))  # Adjusts facet label size
+
+return(plot)
+}
+
+```
+
+```{r `loop to generate and save plots for each variable`}
+plots <- list()
+ylabs <- c(rep("DO Trend (mg/L/y)",3), rep("T Trend (C/y)", 4))
+
+for (i in seq_along(trends_list)) {
+  plotname = paste0(names(trends_list[i]),"_plot")
+  plottitle = names(trends_list[i])
+  ylab = ylabs[i]
+  
+  plot <- profileDepth_plots(trends_list[[i]], title = paste0(plottitle, " vs. Profile Depth"), ylab = ylab)
+  
+  plots[[plotname]] <- plot
+  
+  ggsave(paste0("output_data/trendsVsdepth_plots/" ,plotname, ".jpg"))
+  
+}
+
+```
+
+```{r}
+
+regression_stats <- list()
+
+for (i in seq_along(trends_list)) {
+  data = trends_list[[i]]
+  var = names(trends_list[i])
+  month = unique(trends_list[[i]]$Month)
+  
+  reg.df <- data.frame(variable = var,
+                       month = month,
+                       coefficient = NA,
+                       coef.error = NA,
+                       p.val = NA,
+                       RSQR = NA)
+  
+  for (m in seq_along(month)) {
+    subset.data = data %>%
+      filter(Month == month[m])
+    
+    res <- summary(
+      lm(model_slope ~ StationDepth, data = subset.data)
+    )
+    
+    reg.df$coefficient[m] <- round(res$coefficients[2,1], 4)  # add reg. coefficient to results summary
+    reg.df$coef.error[m] <- round(res$coefficients[2,2], 4)  # add coefficient error to results summary
+    reg.df$p.val[m] <- round(res$coefficients[2,4], 4)   # add p values to results summary
+    reg.df$RSQR[m] <- round(res$adj.r.squared, 4)   # add adj. r sq to results summary
+  }
+  
+  regression_stats[[i]] <- reg.df
+    
+}
+  
+combined_df <- bind_rows(regression_stats)
+
+# write_csv(combined_df, "output_data/trendVsdepth_regressionStatistics.csv")
+
+```

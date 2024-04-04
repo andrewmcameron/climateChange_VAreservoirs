@@ -14,7 +14,7 @@ library(dplyr)
 library(ggplot2)
 
 # read in data
-df <- readr::read_csv("TMax_monthlyByStation_mblmModelStatistics.csv")
+df <- readr::read_csv("output_data/TMax_mblmModelStatistics.csv")
 df.stations <- readr::read_csv("VADEQ_stationInfo.csv")
 df.trendSites <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
 df.merged <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3)

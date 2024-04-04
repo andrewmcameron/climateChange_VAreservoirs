@@ -5,11 +5,9 @@ author: "Andrew Cameron"
 output: html_document
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
-
 ```
 
 ## Data Preprocessing 
@@ -34,43 +32,56 @@ allData.df[13770, (5:8)] <- NA
 ```
 
 ```{r `subset and filter data`}
-# filter for rows corresponding to the 41 stations
 station_IDS <- trendSites.df$FDT_STA_ID
-subset.df <- allData.df %>%
+excluded_sites <- c("2-JKS053.48",
+                    "2-XDD000.40",
+                    "4AROA192.55",
+                    "4AROA196.05",
+                    "5ASRN000.66",
+                    "6ACNR000.00",
+                    "6APNR008.15") # only surface water measurements ever taken
+
+# subset 34 trend sites (41 - 7 excluded)
+trendsites <- allData.df %>%
   mutate(MonthNum = lubridate::month(Date),
          Year = lubridate::year(Date)) %>%
   filter(FDT_STA_ID %in% station_IDS) %>%
-  filter(MonthNum %in% 5:10) %>%
-  filter(MaxDepth.x >= .8*MedDepth)
-
-
-# Paul discovered 5 sites that slipped the filter despite having incomplete profiles (median = .3, but only surface taken)
-# 2-XDD000.40, 4AROA192.55, 5ASRN000.66, 6ACNR000.00, and 6APNR008.1
-incomplete_profiles <- c("2-XDD000.40", "4AROA192.55", "5ASRN000.66", "6ACNR000.00", "6APNR008.15")
-subset.df <- subset.df %>%
-  filter(!FDT_STA_ID %in% incomplete_profiles)
-
-# We missed two other stations with large number of profiles where max depth = .3. I discovered this because the associated station-months resulted in slopes of 0 with sig pvals. Upon examining I discovered max == median & max == .3. Applied `  filter(!MaxDepth.x == MedDepth & !MaxDepth.x <= .3)` to remove these. 
-pval_issues <- c("4AROA038.49", "9-NEW098.32")
-pval_issues <- allData.df %>%
-  mutate(MonthNum = lubridate::month(Date),
-         Year = lubridate::year(Date)) %>% 
-  filter(FDT_STA_ID %in% pval_issues) %>%
+  filter(!FDT_STA_ID %in% excluded_sites) %>%
   filter(MonthNum %in% 5:10)
 
-depthfilters <- pval_issues %>%
-  filter(MaxDepth.x >= .8*MedDepth) %>%
-  filter(!MaxDepth.x == MedDepth & !MaxDepth.x <= .3)
+# apply filters (based on 'Filter' column in "Station Specific Trend Sites.xlsx")
+specialFiltersNeeded <- c("4ABWR017.42", "4AROA038.49", "4AROA192.94", "9-NEW098.32", "9-PKC004.16")
 
-xx <- depthfilters %>%
-  group_by(FDT_STA_ID, MonthNum) %>%
-  summarize(obs = n())  # all but one station-month still has the minimum 10 Nobs after applying filters
+  special1 <- trendsites %>%
+    filter(FDT_STA_ID == "4ABWR017.42") %>%
+    filter(MaxDepth.x >= 5)
+  
+  special2 <- trendsites %>%
+    filter(FDT_STA_ID == "4AROA038.49") %>%
+    filter(MaxDepth.x >= 6)
+  
+  special3 <- trendsites %>%
+    filter(FDT_STA_ID == "4AROA192.94") %>%
+    filter(MaxDepth.x >= 3)
+  
+  special4 <- trendsites %>%
+    filter(FDT_STA_ID == "9-NEW098.32") %>%
+    filter(MaxDepth.x >= 6)
+  
+  special5 <- trendsites %>%
+    filter(FDT_STA_ID == "9-PKC004.16") %>%
+    filter(MaxDepth.x >= 3)
 
-subset.df <- subset.df %>%
-    filter(!MaxDepth.x == MedDepth & !MaxDepth.x <= .3)
+
+sites_less85max <- trendsites %>%
+  filter(!FDT_STA_ID %in% specialFiltersNeeded) %>%
+  filter(MaxDepth.x >= .85*MeanDepth)
+
+# Bring back into single df
+subset.df <- rbind(sites_less85max, special1, special2, special3, special4, special5)
 
 
-# "add a second filter excluding trend results for profiles where NObs<10 (I count there are ~7 of these)"
+# "add additional filter excluding trend results for profiles where NObs<10 (I count there are ~7 of these)"
 # applying this filter to the df for deriving trends (`subset.df`) complicates the code substantially because it results in there not being a corresponding MonthNum 5:10 for each station ID. Filter applied after the trends are derived but before plotting. 
 
 countPerGroup <- subset.df %>%
@@ -84,6 +95,7 @@ insufficient_Nobs <- countPerGroup %>%
 insufficient_Nobs <- insufficient_Nobs$key
 
 ```
+
 
 ## Minimum temperature trend
 

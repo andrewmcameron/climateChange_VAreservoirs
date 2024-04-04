@@ -1,0 +1,50 @@
+variable,month,coefficient,coef.error,p.val,RSQR
+DOMean,May,-7e-4,6e-4,0.2537,0.0109
+DOMean,June,0.0023,0.0013,0.0722,0.0715
+DOMean,July,-8e-4,0.001,0.4033,-0.0086
+DOMean,August,3e-4,9e-4,0.7274,-0.0273
+DOMean,September,5e-4,7e-4,0.5277,-0.0195
+DOMean,October,0.0018,9e-4,0.0416,0.1058
+DOMean,All Months,5e-4,6e-4,0.4565,-0.0133
+DOMin,May,-7e-4,0.0014,0.6034,-0.0232
+DOMin,June,0.0029,0.0015,0.0649,0.0768
+DOMin,July,-0.0015,8e-4,0.0504,0.0868
+DOMin,August,0.0013,9e-4,0.1414,0.0372
+DOMin,September,-0.0015,0.0013,0.2789,0.0069
+DOMin,October,0.0025,9e-4,0.0115,0.173
+DOMin,All Months,5e-4,6e-4,0.4438,-0.0122
+DORange,May,-3e-4,0.0012,0.788,-0.0298
+DORange,June,-0.0013,0.0017,0.4631,-0.0142
+DORange,July,0.0016,0.0013,0.2262,0.0156
+DORange,August,0.001,0.0012,0.4167,-0.0099
+DORange,September,0.003,0.0017,0.0979,0.0583
+DORange,October,-0.001,0.0014,0.4871,-0.0171
+DORange,All Months,5e-4,7e-4,0.5074,-0.017
+TMax,May,0.0013,9e-4,0.1685,0.0236
+TMax,June,0.0013,0.001,0.2082,0.0157
+TMax,July,0.0014,5e-4,0.0033,0.1809
+TMax,August,0.0011,7e-4,0.1314,0.0332
+TMax,September,4e-4,8e-4,0.5873,-0.0178
+TMax,October,-6e-4,0.001,0.5461,-0.016
+TMax,All Months,8e-4,3e-4,0.003,0.1837
+TMean,May,0.0011,0.0011,0.3024,0.0031
+TMean,June,9e-4,0.0014,0.5393,-0.0196
+TMean,July,4e-4,0.0011,0.6859,-0.0259
+TMean,August,3e-4,9e-4,0.7322,-0.0274
+TMean,September,-6e-4,0.0013,0.624,-0.025
+TMean,October,0.001,0.0015,0.48,-0.0165
+TMean,All Months,5e-4,8e-4,0.5045,-0.0168
+TMin,May,-0.0011,9e-4,0.2258,0.0162
+TMin,June,0.0025,0.0011,0.0311,0.1136
+TMin,July,3e-4,0.0014,0.8229,-0.0296
+TMin,August,0.0017,8e-4,0.0517,0.0855
+TMin,September,-3e-4,0.002,0.8826,-0.0326
+TMin,October,0.0022,0.0016,0.1679,0.0323
+TMin,All Months,8e-4,8e-4,0.2867,0.0052
+TRange,May,0.0038,0.0014,0.0091,0.1742
+TRange,June,0,0.0013,0.98,-0.0322
+TRange,July,2e-4,0.0016,0.8807,-0.0305
+TRange,August,-0.0012,0.001,0.2474,0.0116
+TRange,September,0.0031,0.0028,0.2707,0.0083
+TRange,October,-0.0033,0.0011,0.0052,0.2134
+TRange,All Months,5e-4,9e-4,0.6005,-0.0223
