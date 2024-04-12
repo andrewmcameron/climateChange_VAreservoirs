@@ -15,9 +15,9 @@ library(ggplot2)
 
 ```{r `derive/prepare plotting data`, echo=FALSE, include=FALSE}
 # Create list containing trend results for each of the 7 variables
-files <- list.files("~/Desktop/Bukaveckas_WaterLab/climateChange_VAreservoirs/output_data")
+files <- list.files("output_data/")
 mblm_files <- files[grepl("mblmModel", files)]
-path <- "~/Desktop/Bukaveckas_WaterLab/climateChange_VAreservoirs/output_data/"
+path <- paste0(getwd(), "/output_data/")
 
 trends_list <- list()
 for (i in seq_along(mblm_files)) {
@@ -70,7 +70,10 @@ ids_kerrEtal <- c("4AROA018.36", "4AROA038.49", "4AROA140.66", "4AROA145.34", "4
                   "4AROA167.34", "4AROA175.63", "4AROA180.21", "4AROA183.64", "4AROA192.55", "4AROA192.94",
                   "4AROA196.05")
 
-ids_combined <- c(ids_moomaw, ids_philpott, ids_claytor, ids_kerrEtal)
+ids_SML <- c("4AROA158.22", "4AROA163.76", "4AROA167.34", "4AROA175.63", "4AROA180.21", "4AROA183.64", 
+             "4AROA192.55", "4AROA192.94", "4AROA196.05")
+
+ids_combined <- c(ids_moomaw, ids_philpott, ids_claytor, ids_kerrEtal, ids_SML)
 
 for (i in seq_along(trends_list)) {
   df = trends_list[[i]]
@@ -97,7 +100,7 @@ mileage_substrings <- regmatches(ids_combined, mileage_matches)
 
 river_miles <- data.frame(STATION_ID = ids_combined,
                           RIVERMILE = unlist(mileage_substrings),
-                          RESERVOIR = c(rep("Moomaw", 4), rep("Philpott", 4), rep("Claytor", 4), rep("Kerr-Leesville-Smith Mountain", 13)))
+                          RESERVOIR = c(rep("Moomaw", 4), rep("Philpott", 4), rep("Claytor", 4), rep("Kerr-Leesville-Smith Mountain", 13), rep("SML", 9)))
 
 # remove leading 0 from any river mile value
 river_miles$RIVERMILE <- sub("^[0]+", "", river_miles$RIVERMILE)
@@ -223,7 +226,7 @@ combined_variables<- lapply(regression_stats, function(x){
 combined_all <- bind_rows(combined_variables)
 
 
- # write_csv(combined_all, "output_data/trendVsRiverMile_regressionStatistics.csv")
+ write_csv(combined_all, "output_data/trendVsRiverMile_regressionStatistics.csv")
  
 ```
 

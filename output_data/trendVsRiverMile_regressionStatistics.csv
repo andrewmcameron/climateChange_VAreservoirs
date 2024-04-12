@@ -27,6 +27,13 @@ DOMean,August,Kerr-Leesville-Smith Mountain,-8e-4,4e-4,0.0669,0.2504
 DOMean,September,Kerr-Leesville-Smith Mountain,2e-4,5e-4,0.7069,-0.104
 DOMean,October,Kerr-Leesville-Smith Mountain,5e-4,5e-4,0.3836,-0.0173
 DOMean,All Months,Kerr-Leesville-Smith Mountain,-2e-4,3e-4,0.4637,-0.0432
+DOMean,May,SML,0.0014,0.001,0.2134,0.1467
+DOMean,June,SML,-0.0033,0.001,0.0233,0.6106
+DOMean,July,SML,-0.0011,0.0014,0.4584,-0.0629
+DOMean,August,SML,-0.0037,0.0011,0.0194,0.6369
+DOMean,September,SML,-0.0023,7e-4,0.0232,0.6114
+DOMean,October,SML,6e-4,8e-4,0.4765,-0.073
+DOMean,All Months,SML,-0.0014,8e-4,0.1408,0.2552
 DOMin,May,Moomaw,-0.0091,0.0097,0.5202,-0.0633
 DOMin,June,Moomaw,-0.0288,0.0081,0.1742,0.8539
 DOMin,July,Moomaw,-0.0197,0.0188,0.4846,0.0483
@@ -55,6 +62,13 @@ DOMin,August,Kerr-Leesville-Smith Mountain,1e-4,4e-4,0.8793,-0.1081
 DOMin,September,Kerr-Leesville-Smith Mountain,1e-4,3e-4,0.7825,-0.1137
 DOMin,October,Kerr-Leesville-Smith Mountain,1e-4,0.001,0.9537,-0.1423
 DOMin,All Months,Kerr-Leesville-Smith Mountain,2e-4,3e-4,0.5457,-0.0645
+DOMin,May,SML,0.0023,0.0016,0.2175,0.1415
+DOMin,June,SML,-0.0032,0.0021,0.1992,0.1652
+DOMin,July,SML,0.003,8e-4,0.0112,0.7057
+DOMin,August,SML,-0.0037,0.001,0.0132,0.6865
+DOMin,September,SML,-1e-4,5e-4,0.7621,-0.176
+DOMin,October,SML,-2e-4,0.0016,0.8941,-0.1953
+DOMin,All Months,SML,-3e-4,9e-4,0.7385,-0.1708
 DORange,May,Moomaw,0.0197,0.002,0.0659,0.9786
 DORange,June,Moomaw,0.0717,0.0225,0.1935,0.8208
 DORange,July,Moomaw,0.0045,0.0083,0.6829,-0.5435
@@ -83,6 +97,13 @@ DORange,August,Kerr-Leesville-Smith Mountain,-4e-4,6e-4,0.5443,-0.0642
 DORange,September,Kerr-Leesville-Smith Mountain,-7e-4,7e-4,0.342,0.0023
 DORange,October,Kerr-Leesville-Smith Mountain,-0,0.0023,0.9948,-0.1428
 DORange,All Months,Kerr-Leesville-Smith Mountain,-3e-4,4e-4,0.4489,-0.0388
+DORange,May,SML,-7e-4,0.0021,0.761,-0.1757
+DORange,June,SML,0.0016,0.0031,0.623,-0.1377
+DORange,July,SML,-0.0031,8e-4,0.0123,0.6947
+DORange,August,SML,3e-4,0.0021,0.9113,-0.1967
+DORange,September,SML,0.0016,0.0018,0.4134,-0.0353
+DORange,October,SML,0.004,0.004,0.3611,0.0016
+DORange,All Months,SML,6e-4,0.0014,0.6783,-0.1553
 TMax,May,Moomaw,-0.0012,7e-4,0.2357,0.3763
 TMax,June,Moomaw,-5e-4,0.001,0.6785,-0.345
 TMax,July,Moomaw,-0.0048,0.0016,0.1016,0.7108
@@ -111,6 +132,13 @@ TMax,August,Kerr-Leesville-Smith Mountain,-5e-4,3e-4,0.0865,0.1749
 TMax,September,Kerr-Leesville-Smith Mountain,9e-4,5e-4,0.0813,0.1828
 TMax,October,Kerr-Leesville-Smith Mountain,-3e-4,3e-4,0.391,-0.0172
 TMax,All Months,Kerr-Leesville-Smith Mountain,0,3e-4,0.9486,-0.0905
+TMax,May,SML,-0.0019,0.0012,0.1519,0.1654
+TMax,June,SML,-0.0021,8e-4,0.0414,0.3947
+TMax,July,SML,-0.0027,8e-4,0.0098,0.5861
+TMax,August,SML,-0.0012,6e-4,0.076,0.2939
+TMax,September,SML,-0.0018,0.0012,0.1611,0.1539
+TMax,October,SML,-0.0018,0.001,0.1061,0.2335
+TMax,All Months,SML,-0.0019,6e-4,0.0145,0.5405
 TMean,May,Moomaw,-0.0029,0.0032,0.5337,-0.1056
 TMean,June,Moomaw,-0.0057,0.0067,0.553,-0.1658
 TMean,July,Moomaw,0.0088,0.0085,0.4887,0.0355
@@ -139,6 +167,13 @@ TMean,August,Kerr-Leesville-Smith Mountain,-8e-4,3e-4,0.024,0.3883
 TMean,September,Kerr-Leesville-Smith Mountain,-1e-4,3e-4,0.5958,-0.0837
 TMean,October,Kerr-Leesville-Smith Mountain,-4e-4,3e-4,0.2628,0.0569
 TMean,All Months,Kerr-Leesville-Smith Mountain,-3e-4,2e-4,0.10780000000000001,0.1796
+TMean,May,SML,0.0016,0.0014,0.3134,0.0408
+TMean,June,SML,0,6e-4,0.9879,-0.1999
+TMean,July,SML,-0.002,0.0011,0.1469,0.2446
+TMean,August,SML,-0.0017,6e-4,0.0459,0.4991
+TMean,September,SML,0.0015,5e-4,0.0385,0.5306
+TMean,October,SML,-0.0012,4e-4,0.0323,0.5601
+TMean,All Months,SML,-3e-4,5e-4,0.5459,-0.1072
 TMin,May,Moomaw,-0.0127,0.0037,0.1799,0.8444
 TMin,June,Moomaw,0.0015,0.006,0.8417,-0.8789
 TMin,July,Moomaw,0.0077,0.015,0.6986,-0.5841
@@ -167,6 +202,13 @@ TMin,August,Kerr-Leesville-Smith Mountain,-1e-4,4e-4,0.8022,-0.103
 TMin,September,Kerr-Leesville-Smith Mountain,0.001,6e-4,0.1285,0.1723
 TMin,October,Kerr-Leesville-Smith Mountain,-4e-4,9e-4,0.6798,-0.1134
 TMin,All Months,Kerr-Leesville-Smith Mountain,1e-4,4e-4,0.8673,-0.1075
+TMin,May,SML,8e-4,0.0025,0.7752,-0.1786
+TMin,June,SML,-0.0037,8e-4,0.0066,0.759
+TMin,July,SML,-0.0026,0.0011,0.0715,0.4119
+TMin,August,SML,-0.0035,4e-4,4e-4,0.9209
+TMin,September,SML,-7e-4,0.0012,0.5646,-0.1152
+TMin,October,SML,-0.0033,7e-4,0.0066,0.7602
+TMin,All Months,SML,-0.0022,0.001,0.0828,0.3802
 TRange,May,Moomaw,0.0126,0.0142,0.5372,-0.1165
 TRange,June,Moomaw,-0.0015,4e-4,0.1563,0.8818
 TRange,July,Moomaw,0.0067,0.0152,0.7354,-0.6739
@@ -195,3 +237,10 @@ TRange,August,Kerr-Leesville-Smith Mountain,-1e-4,5e-4,0.8109,-0.1037
 TRange,September,Kerr-Leesville-Smith Mountain,4e-4,0.0012,0.7289,-0.1072
 TRange,October,Kerr-Leesville-Smith Mountain,1e-4,9e-4,0.8804,-0.1389
 TRange,All Months,Kerr-Leesville-Smith Mountain,3e-4,5e-4,0.5953,-0.0749
+TRange,May,SML,0.003,0.0026,0.2949,0.0578
+TRange,June,SML,0.0014,0.0013,0.3289,0.0274
+TRange,July,SML,4e-4,0.0013,0.7729,-0.1781
+TRange,August,SML,0.0038,0.0016,0.0608,0.445
+TRange,September,SML,-6e-4,0.0038,0.8848,-0.1945
+TRange,October,SML,0.0027,0.0011,0.0621,0.4408
+TRange,All Months,SML,0.0018,0.0018,0.3581,0.0039
