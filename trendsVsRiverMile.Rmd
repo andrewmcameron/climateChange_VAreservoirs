@@ -1,0 +1,450 @@
+---
+title: "Spatial Trends within Temporal Trends"
+output: 
+  html_document:
+    toc: TRUE
+    toc_depth: 4
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r `derive/prepare plotting data`, echo=FALSE, include=FALSE}
+# Create list containing trend results for each of the 7 variables
+files <- list.files("~/Desktop/Bukaveckas_WaterLab/climateChange_VAreservoirs/output_data")
+mblm_files <- files[grepl("mblmModel", files)]
+path <- "~/Desktop/Bukaveckas_WaterLab/climateChange_VAreservoirs/output_data/"
+
+trends_list <- list()
+for (i in seq_along(mblm_files)) {
+  df <- read_csv(paste0(path, mblm_files[i]))
+  
+  file_name_prefix <- sub("_(.*)", "", mblm_files[i])
+  
+  trends_list[[file_name_prefix]] <- df
+}
+
+## ----------------------------------------------------------------------------
+# derive all months mean values and incorporate back into df for plotting
+trends_list <- lapply(trends_list, function(df) {
+  all_months_mean <- df %>%
+    group_by(FDT_STA_ID) %>%
+    summarize(mean_slope = mean(model_slope, na.rm = TRUE), .groups = "drop") %>%
+    mutate(Month = "All Months",
+           trend = "N/A")
+  
+  # Combine the original df with all months summary
+  combined_df <- bind_rows(df, all_months_mean)
+
+  # single column containing slopes (for use as y variable when plotting) -- currently "All Months" slopes are in their own column
+  combined_df <- combined_df %>%
+    mutate(model_slope = if_else(Month == "All Months", mean_slope, model_slope))
+  
+  # set month as factor and identify significant vs not significant trends
+  combined_df <- combined_df %>%
+    mutate(Month = factor(Month, levels = c("January", "February", "March", "April", 
+                                            "May", "June", "July", "August", "September", 
+                                            "October", "November", "December", "All Months")),
+          trend = ifelse(is.na(combined_df$model_pval), "N/A",
+                        ifelse(combined_df$model_pval <= 0.05, "significant", "not significant"))) 
+
+  combined_df$trend <- factor(combined_df$trend, levels = c("significant", "not significant", "N/A"))
+
+return(combined_df)
+})
+
+## -----------------------------------------------------------------------------
+# filter to include only the stations corresponding to reservoirs to be analyzed
+
+ids_moomaw <- c("2-JKS044.60", "2-JKS046.40", "2-JKS048.90", "2-JKS053.48")
+
+ids_philpott <- c("4ASRE046.90", "4ASRE048.98", "4ASRE052.31", "4ASRE056.06")
+
+ids_claytor <- c("9-NEW087.14", "9-NEW089.34", "9-NEW092.66", "9-NEW098.32")  # tributary stations "9-PKC000.00", "9-PKC004.16" excluded from regression analysis 
+
+ids_kerrEtal <- c("4AROA018.36", "4AROA038.49", "4AROA140.66", "4AROA145.34", "4AROA158.22", "4AROA163.76",
+                  "4AROA167.34", "4AROA175.63", "4AROA180.21", "4AROA183.64", "4AROA192.55", "4AROA192.94",
+                  "4AROA196.05")
+
+ids_combined <- c(ids_moomaw, ids_philpott, ids_claytor, ids_kerrEtal)
+
+for (i in seq_along(trends_list)) {
+  df = trends_list[[i]]
+  
+  filtered_df <- df %>%
+    filter(FDT_STA_ID %in% ids_combined)
+  
+  trends_list[[i]] <- filtered_df
+}
+
+## -----------------------------------------------------------------------------
+# incorporate river mile (dependent  variable) into dfs
+## regex expression matching to extract the mileage values
+mileage_matches <- gregexpr("[0-9]+\\.[0-9]+", ids_combined)
+    ## regex explanation
+      # [0-9]: match any single digit from 1 to 9.
+      # 
+      # +: quantifier that matches one or more of the preceding element. In this case, match a sequence of 1 or more digits
+      # 
+      # \\.: matches a literal dot (.). Dot is normally is a special character that matches any single character (except newline characters). To match a literal dot, you need to escape it with a backslash, which itself must be escaped in order to read as a literal backslash.
+
+
+mileage_substrings <- regmatches(ids_combined, mileage_matches)
+
+river_miles <- data.frame(STATION_ID = ids_combined,
+                          RIVERMILE = unlist(mileage_substrings),
+                          RESERVOIR = c(rep("Moomaw", 4), rep("Philpott", 4), rep("Claytor", 4), rep("Kerr-Leesville-Smith Mountain", 13)))
+
+# remove leading 0 from any river mile value
+river_miles$RIVERMILE <- sub("^[0]+", "", river_miles$RIVERMILE)
+
+# Claytor Lake reservoir has two stations that are not along the main flow, instead on tributary that feeds into New River.
+# manually set Peak Creek tributary station values based on GIS measurement of distance from southernmost Claytor Lake station
+river_miles$RIVERMILE[c(13,14)] <- c("90.4", "94.1")
+
+# Set RIVERMILE field to numeric
+river_miles$RIVERMILE <- as.numeric(river_miles$RIVERMILE)
+
+trends_list <- lapply(trends_list, function(df) {
+  df %>% 
+    left_join(river_miles, by = c("FDT_STA_ID" = "STATION_ID"))
+})
+
+
+# Create separate objects for each variable
+list2env(trends_list, envir = .GlobalEnv)
+
+```
+
+
+```{r `plot regressions`, fig.height = 6.5, warning=FALSE, message=FALSE, echo=FALSE}
+
+reservoirs = unique(river_miles$RESERVOIR)
+all_plots <- list()
+
+for (i in seq_along(trends_list)){
+  df = trends_list[[i]]
+  plots_by_reservoir = list()
+  
+ for (j in seq_along(reservoirs)) {
+  current_reservoir = reservoirs[j]
+  variable = names(trends_list[i])
+  subset.data <- df %>%
+    filter(RESERVOIR == current_reservoir)
+  
+      plot <- ggplot() +
+        geom_point(data = subset.data,
+                   aes(x = RIVERMILE, y = model_slope,
+                       shape = trend), alpha = .6, size = 2) +
+        geom_smooth(data = subset.data, aes(x = RIVERMILE,  y = model_slope),
+                    method = "lm") +
+        facet_wrap(~factor(Month), scales = "free_y") +
+        labs(title = paste0(current_reservoir, " ", variable),
+             x = "River Mile Along Flowpath",
+             y = NULL) +  
+        scale_shape_manual(values = c(1, 16, 10)) +
+        theme_minimal() + 
+        theme(legend.position = "top",
+              panel.border = element_rect(colour = "black", fill=NA, size=.5),
+              plot.title = element_text(size = 16),  # plot title size
+              axis.title = element_text(size = 14),  # axis titles size
+              axis.text = element_text(size = 11.5),  # axis text size
+              legend.text = element_text(size = 9.5),  # legend text size
+              legend.title = element_text(size = 10.5),  # legend title size
+              strip.text = element_text(size = 12), # facet label size
+              plot.margin = margin(r = 35, l = 35, t = 20, b = 20, unit = "pt"))  
+      
+      plots_by_reservoir[[current_reservoir]] <- plot
+ }
+  
+  all_plots[[variable]] <- plots_by_reservoir
+}
+
+```
+
+```{r, echo=FALSE}
+# for each df (variable)
+ #   for each reservoir create a regresstion stats df
+   #   for each month, run regression and store results in reg,stats df
+
+
+
+regression_stats <- list()
+
+for (i in seq_along(trends_list)) {
+  current_df = trends_list[[i]]
+  variable = names(trends_list[i])
+  month = unique(current_df$Month)
+  current_var_reg_stats <- list()
+  
+  for (j in seq_along(reservoirs)) {
+      individual_reservoir_data <- 
+        current_df %>%
+        filter(RESERVOIR == reservoirs[j])
+      
+    for (m in seq_along(month)) {
+      reg.df <- data.frame(variable = variable,
+                           month = month[m],
+                           reservoir = reservoirs[j],
+                           coefficient = NA,
+                           coef.error = NA,
+                           p.val = NA,
+                           RSQR = NA)
+      
+      month_data = individual_reservoir_data %>%
+        filter(Month == month[m])
+    
+      res <- summary(
+        lm(model_slope ~ RIVERMILE, data = month_data)
+      )
+      
+      reg.df$coefficient <- round(res$coefficients[2,1], 4)  # add reg. coefficient to results summary
+      reg.df$coef.error <- round(res$coefficients[2,2], 4)  # add coefficient error to results summary
+      reg.df$p.val <- round(res$coefficients[2,4], 4)   # add p values to results summary
+      reg.df$RSQR <- round(res$adj.r.squared, 4)   # add adj. r sq to results summary
+      
+      current_var_reg_stats[[paste0(month[m], "_", reservoirs[j], "_", variable)]] <- reg.df
+    }
+      
+  regression_stats[[variable]] <- current_var_reg_stats     
+  }
+ 
+}
+  
+combined_variables<- lapply(regression_stats, function(x){
+  bind_rows(x)
+}
+)
+
+combined_all <- bind_rows(combined_variables)
+
+
+ # write_csv(combined_all, "output_data/trendVsRiverMile_regressionStatistics.csv")
+ 
+```
+
+## TMax vs River Mile
+
+<br>
+
+#### Regression Plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(kableExtra)
+
+for(reservoir in names(all_plots[["TMax"]])){
+  plot <- all_plots[["TMax"]][[reservoir]]
+  print(plot)
+}
+```
+
+<br>
+
+#### Regression Statistics
+
+```{r, echo=FALSE}
+combined_all %>%
+  filter(variable == "TMax") %>%
+  kable(align = "c", 
+        caption = "Regression Statistics for TMax Trend vs River Mile") %>%
+  kable_paper() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")
+  )
+
+```
+
+<br><br>
+
+## TMin vs River Mile
+
+<br>
+
+#### Regression Plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(kableExtra)
+
+for(reservoir in names(all_plots[["TMin"]])){
+  plot <- all_plots[["TMin"]][[reservoir]]
+  print(plot)
+}
+```
+
+<br>
+
+#### Regression Statistics
+
+```{r, echo=FALSE, message=FALSE}
+combined_all %>%
+  filter(variable == "TMin") %>%
+  kable(align = "c", 
+        caption = "Regression Statistics for TMin Trend vs River Mile") %>%
+  kable_paper() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")
+  )
+
+```
+
+<br><br>
+
+## TMean vs River Mile
+
+<br>
+
+#### Regression Plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(kableExtra)
+
+for(reservoir in names(all_plots[["TMean"]])){
+  plot <- all_plots[["TMean"]][[reservoir]]
+  print(plot)
+}
+```
+
+<br>
+
+#### Regression Statistics
+
+```{r, echo=FALSE, message=FALSE}
+combined_all %>%
+  filter(variable == "TMean") %>%
+  kable(align = "c", 
+        caption = "Regression Statistics for TMean Trend vs River Mile") %>%
+  kable_paper() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")
+  )
+
+```
+
+<br><br>
+
+## TRange vs River Mile
+
+<br>
+
+#### Regression Plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(kableExtra)
+
+for(reservoir in names(all_plots[["TRange"]])){
+  plot <- all_plots[["TRange"]][[reservoir]]
+  print(plot)
+}
+```
+
+<br>
+
+#### Regression Statistics
+
+```{r, echo=FALSE, message=FALSE}
+combined_all %>%
+  filter(variable == "TRange") %>%
+  kable(align = "c", 
+        caption = "Regression Statistics for TRange Trend vs River Mile") %>%
+  kable_paper() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")
+  )
+
+```
+
+<br><br>
+
+## DOMin vs River Mile
+
+<br>
+
+#### Regression Plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(kableExtra)
+
+for(reservoir in names(all_plots[["DOMin"]])){
+  plot <- all_plots[["DOMin"]][[reservoir]]
+  print(plot)
+}
+```
+
+<br>
+
+#### Regression Statistics
+
+```{r, echo=FALSE, message=FALSE}
+combined_all %>%
+  filter(variable == "DOMin") %>%
+  kable(align = "c", 
+        caption = "Regression Statistics for DOMin Trend vs River Mile") %>%
+  kable_paper() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")
+  )
+
+```
+
+<br><br>
+
+## DOMean vs River Mile
+
+<br>
+
+#### Regression Plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(kableExtra)
+
+for(reservoir in names(all_plots[["DOMean"]])){
+  plot <- all_plots[["DOMean"]][[reservoir]]
+  print(plot)
+}
+```
+
+<br>
+
+#### Regression Statistics
+
+```{r, echo=FALSE, message=FALSE}
+combined_all %>%
+  filter(variable == "DOMean") %>%
+  kable(align = "c", 
+        caption = "Regression Statistics for DOMean Trend vs River Mile") %>%
+  kable_paper() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")
+  )
+
+```
+
+<br><br>
+
+## DORange vs River Mile
+
+<br>
+
+#### Regression Plots
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(kableExtra)
+
+for(reservoir in names(all_plots[["DORange"]])){
+  plot <- all_plots[["DORange"]][[reservoir]]
+  print(plot)
+}
+```
+
+<br>
+
+#### Regression Statistics
+
+```{r, echo=FALSE, message=FALSE}
+combined_all %>%
+  filter(variable == "DORange") %>%
+  kable(align = "c", 
+        caption = "Regression Statistics for DORange Trend vs River Mile") %>%
+  kable_paper() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")
+  )
+
+```
