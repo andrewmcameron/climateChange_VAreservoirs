@@ -1,0 +1,807 @@
+---
+title: "Long-Term Annual Trends in T & DO"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+
+```
+
+      There is one more thing I would like to try with this dataset, which is to look at long-term trends in seasonal changes in T and DO.  What I mean by this is that I would like to calculate rates of warming and declining oxygen for each year, and then determine whether there is a long-term trend in these annual trends.
+    For this analysis we will be using data for May-Sep (since lakes are cooling by Oct).
+    I think we should focus on data starting in 1999 as I don't think the earlier data will have sufficient resolution (enough months in a given year).
+    As an example, the first set of relevant data in the 41-station file is from 1999 for station 2-JKS044.60.  In this year, there are monthly measurements starting May 18 through Sep 23.  You will want to calculate a slope to depict the rate of change in T and DO min, mean, max, and range.     In this case, there are 5 observations for Tmin (5.7 to 8.6) yielding a slope in C/day.  You would then calculate the same slopes for the next available year (2001).  I would suggest that we only use years in which we have a minimum of 4 observations (i.e., measurements in 4 of the 5 months).  For the surface-only stations, we only need slopes for Tmax and DOmax.
+    Once we have the slopes for each year, then we can fit an mblm regression for the data from that station.
+    
+This analysis effectively susbstitutes the station-year for the station-month as the unit of analysis in deriving trends.
+
+
+```{r `read in data`}
+trendSites.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
+allData.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3)
+
+# Convert `date` column from Excel encoded date to a more legible date format. Otherwise date shows as numeric value, e.g. '44230'.
+    allData.df$Date <- allData.df$Date * 86400      # 86400 = seconds in a day.
+    allData.df$Date <- as.POSIXct(allData.df$Date, origin = "1899-12-30", tz = "UTC")
+    
+```
+
+```{r 'remove anomlies'}
+# a surface temperature (Tmax) of 2.8 C in August
+# 13774 	6ACNR000.00 	8/28/1990 	0.3 	NA 	NA 	NA 	NA
+
+which(grepl("13774", allData.df$X1))
+allData.df[13770, (5:8)] <- NA
+
+```
+
+```{r `subset data`}
+# filter for rows corresponding to the 41 stations
+station_IDS <- trendSites.df$FDT_STA_ID
+
+surfaceOnly_IDs <- c("2-JKS053.48",
+                    "2-XDD000.40",
+                    "4AROA192.55",
+                    "4AROA196.05",
+                    "5ASRN000.66",
+                    "6ACNR000.00",
+                    "6APNR008.15") # only surface water measurements ever taken
+
+# May to Sep only; reservoirs are cooling by Oct
+subset.df <- allData.df %>%
+  mutate(MonthNum = lubridate::month(Date)) %>%  
+  filter(FDT_STA_ID %in% station_IDS) %>%
+  filter(MonthNum %in% 5:9) %>%
+  filter(year(Date) >= 1999) %>%
+  mutate(stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date))))
+
+# Identify station years with < 4 profiles
+yrs_insufObs <- subset.df %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(n()) %>%
+  filter(`n()` < 4) %>%
+  mutate(stationYear = paste0(FDT_STA_ID,"-", as.character(`year(Date)`)))
+
+# exclude years with fewer than 4 obs
+subset.df <- subset.df %>%
+  filter(!stationYear %in% yrs_insufObs$stationYear)
+
+```
+
+Variable-by-variable filtering must be done to further eliminate station-years where Nobs < 4. Some station-years that passed initial filter above nevertheless lack 4 or more observations for specific variables.
+
+```{r `slopes list`}
+slopesList <- list()
+
+```
+
+## Min, Mean, Range slopes
+
+**Exclude surface-only stations from these analyses** 
+
+### Temp
+
+```{r}
+# TMin
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+TMin_yrSta_Nobs <- subset.df %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(TMin))),
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  summarize(stationYear = stationYear,
+            validObs = validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 4 Nobs
+TMin_insufNobs <- TMin_yrSta_Nobs %>%
+  group_by(stationYear) %>%
+  filter(validObs < 4) %>%
+  summarize(stationYear = unique(stationYear))
+
+TMin_slopes <- subset.df %>%
+  select(FDT_STA_ID, TMin, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% TMin_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs) %>%
+  group_by(FDT_STA_ID, year = year(Date)) %>%
+  summarize(deltaY = max(TMin, na.rm = TRUE) - min(TMin, na.rm=TRUE),
+            deltaX = max(DOY) - min(DOY),
+            slope = deltaY / deltaX,
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  ungroup() %>%
+  group_by(stationYear) %>%
+  slice_head() %>%
+  ungroup()
+
+slopesList[["TMin"]] <- TMin_slopes
+
+```
+
+```{r}
+# TMean
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+TMean_yrSta_Nobs <- subset.df %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(TMean))),
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  summarize(stationYear = stationYear,
+            validObs = validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 4 Nobs
+TMean_insufNobs <- TMean_yrSta_Nobs %>%
+  group_by(stationYear) %>%
+  filter(validObs < 4) %>%
+  summarize(stationYear = unique(stationYear))
+
+TMean_slopes <- subset.df %>%
+  select(FDT_STA_ID, TMean, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% TMean_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs) %>%
+  group_by(FDT_STA_ID, year = year(Date)) %>%
+  summarize(deltaY = max(TMean, na.rm = TRUE) - min(TMean, na.rm=TRUE),
+            deltaX = max(DOY) - min(DOY),
+            slope = deltaY / deltaX,
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  ungroup() %>%
+  group_by(stationYear) %>%
+  slice_head() %>%
+  ungroup()
+
+slopesList[["TMean"]] <- TMean_slopes
+
+```
+
+
+```{r}
+# TRange
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+TRange_yrSta_Nobs <- subset.df %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(TRange))),
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  summarize(stationYear = stationYear,
+            validObs = validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 4 Nobs
+TRange_insufNobs <- TRange_yrSta_Nobs %>%
+  group_by(stationYear) %>%
+  filter(validObs < 4) %>%
+  summarize(stationYear = unique(stationYear))
+
+TRange_slopes <- subset.df %>%
+  select(FDT_STA_ID, TRange, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% TRange_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs) %>%
+  group_by(FDT_STA_ID, year = year(Date)) %>%
+  summarize(deltaY = max(TRange, na.rm = TRUE) - min(TRange, na.rm=TRUE),
+            deltaX = max(DOY) - min(DOY),
+            slope = deltaY / deltaX,
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  ungroup() %>%
+  group_by(stationYear) %>%
+  slice_head() %>%
+  ungroup()
+
+slopesList[["TRange"]] <- TRange_slopes
+
+```
+
+### DO
+
+```{r}
+# DOMin
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+DOMin_yrSta_Nobs <- subset.df %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(DOMin))),
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  summarize(stationYear = stationYear,
+            validObs = validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 4 Nobs
+DOMin_insufNobs <- DOMin_yrSta_Nobs %>%
+  group_by(stationYear) %>%
+  filter(validObs < 4) %>%
+  summarize(stationYear = unique(stationYear))
+
+DOMin_slopes <- subset.df %>%
+  select(FDT_STA_ID, DOMin, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% DOMin_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs) %>%
+  group_by(FDT_STA_ID, year = year(Date)) %>%
+  summarize(deltaY = max(DOMin, na.rm = TRUE) - min(DOMin, na.rm=TRUE),
+            deltaX = max(DOY) - min(DOY),
+            slope = deltaY / deltaX,
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  ungroup() %>%
+  group_by(stationYear) %>%
+  slice_head() %>%
+  ungroup()
+
+slopesList[["DOMin"]] <- DOMin_slopes
+
+```
+
+```{r}
+# DOMean
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+DOMean_yrSta_Nobs <- subset.df %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(DOMean))),
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  summarize(stationYear = stationYear,
+            validObs = validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 4 Nobs
+DOMean_insufNobs <- DOMean_yrSta_Nobs %>%
+  group_by(stationYear) %>%
+  filter(validObs < 4) %>%
+  summarize(stationYear = unique(stationYear))
+
+DOMean_slopes <- subset.df %>%
+  select(FDT_STA_ID, DOMean, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% DOMean_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs) %>%
+  group_by(FDT_STA_ID, year = year(Date)) %>%
+  summarize(deltaY = max(DOMean, na.rm = TRUE) - min(DOMean, na.rm=TRUE),
+            deltaX = max(DOY) - min(DOY),
+            slope = deltaY / deltaX,
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  ungroup() %>%
+  group_by(stationYear) %>%
+  slice_head() %>%
+  ungroup()
+
+slopesList[["DOMean"]] <- DOMean_slopes
+
+```
+
+```{r}
+# DORange
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+DORange_yrSta_Nobs <- subset.df %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(DORange))),
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  summarize(stationYear = stationYear,
+            validObs = validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 4 Nobs
+DORange_insufNobs <- DORange_yrSta_Nobs %>%
+  group_by(stationYear) %>%
+  filter(validObs < 4) %>%
+  summarize(stationYear = unique(stationYear))
+
+DORange_slopes <- subset.df %>%
+  select(FDT_STA_ID, DORange, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% DORange_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs) %>%
+  group_by(FDT_STA_ID, year = year(Date)) %>%
+  summarize(deltaY = max(DORange, na.rm = TRUE) - min(DORange, na.rm=TRUE),
+            deltaX = max(DOY) - min(DOY),
+            slope = deltaY / deltaX,
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  ungroup() %>%
+  group_by(stationYear) %>%
+  slice_head() %>%
+  ungroup()
+
+slopesList[["DORange"]] <- DORange_slopes
+
+```
+
+
+## TMax and DOMax slopes
+
+All 41 stations eligible for inclusion
+
+```{r}
+# TMax
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+TMax_yrSta_Nobs <- subset.df %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(TMax))),
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  summarize(stationYear = stationYear,
+            validObs = validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 4 Nobs
+TMax_insufNobs <- TMax_yrSta_Nobs %>%
+  group_by(stationYear) %>%
+  filter(validObs < 4) %>%
+  summarize(stationYear = unique(stationYear))
+
+TMax_slopes <- subset.df %>%
+  select(FDT_STA_ID, TMax, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% TMax_insufNobs$stationYear) %>%
+  group_by(FDT_STA_ID, year = year(Date)) %>%
+  summarize(deltaY = max(TMax, na.rm = TRUE) - min(TMax, na.rm=TRUE),
+            deltaX = max(DOY) - min(DOY),
+            slope = deltaY / deltaX,
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  ungroup() %>%
+  group_by(stationYear) %>%
+  slice_head() %>%
+  ungroup()
+
+slopesList[["TMax"]] <- TMax_slopes
+
+```
+
+```{r}
+# DOMax
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+DOMax_yrSta_Nobs <- subset.df %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(DOMax))),
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  summarize(stationYear = stationYear,
+            validObs = validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 4 Nobs
+DOMax_insufNobs <- DOMax_yrSta_Nobs %>%
+  group_by(stationYear) %>%
+  filter(validObs < 4) %>%
+  summarize(stationYear = unique(stationYear))
+
+DOMax_slopes <- subset.df %>%
+  select(FDT_STA_ID, DOMax, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% DOMax_insufNobs$stationYear) %>%
+  group_by(FDT_STA_ID, year = year(Date)) %>%
+  summarize(deltaY = max(DOMax, na.rm = TRUE) - min(DOMax, na.rm=TRUE),
+            deltaX = max(DOY) - min(DOY),
+            slope = deltaY / deltaX,
+            stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date)))) %>%
+  ungroup() %>%
+  group_by(stationYear) %>%
+  slice_head() %>%
+  ungroup()
+
+slopesList[["DOMax"]] <- DOMax_slopes
+
+```
+
+## MBLM, seasonal rate of change ~ year
+
+```{r}
+library(mblm)
+
+
+```
+
+### TMin
+
+```{r `fit regressions TMin`}
+#TMin
+
+## --------------------------
+# create list to store regression results
+TMin_modSums <- list()
+
+for (station_id in unique(TMin_slopes$FDT_STA_ID)) {
+  model_data <- TMin_slopes %>%
+    filter(FDT_STA_ID == station_id)
+    
+
+      model <- mblm(slope ~ year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      TMin_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["year", "MAD"] ,
+        pvalue = mod.sum$coefficients["year", 4]
+        )
+  }
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+TMin_mblm <- data.frame(StationID = unique(TMin_slopes$FDT_STA_ID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          variable = "TMin")
+
+for (i in 1:nrow(TMin_mblm)) {
+  station = TMin_mblm$StationID[i]
+  
+  TMin_mblm$model_slope[i] <-  TMin_modSums[[station]]$slope
+   TMin_mblm$model_MAD[i] <-  TMin_modSums[[station]]$MAD
+    TMin_mblm$model_pval[i] <-  TMin_modSums[[station]]$pvalue
+  
+}
+
+write_csv(TMin_mblm, "output_data/annualLongTerm/TMin_mblmAnnual.csv")
+```
+
+### TMean
+
+```{r `fit regressions TMean`}
+#TMean
+
+## --------------------------
+# create list to store regression results
+TMean_modSums <- list()
+
+for (station_id in unique(TMean_slopes$FDT_STA_ID)) {
+  model_data <- TMean_slopes %>%
+    filter(FDT_STA_ID == station_id)
+    
+
+      model <- mblm(slope ~ year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      TMean_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["year", "MAD"] ,
+        pvalue = mod.sum$coefficients["year", 4]
+        )
+  }
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+TMean_mblm <- data.frame(StationID = unique(TMean_slopes$FDT_STA_ID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          variable = "TMean")
+
+for (i in 1:nrow(TMean_mblm)) {
+  station = TMean_mblm$StationID[i]
+  
+  TMean_mblm$model_slope[i] <-  TMean_modSums[[station]]$slope
+   TMean_mblm$model_MAD[i] <-  TMean_modSums[[station]]$MAD
+    TMean_mblm$model_pval[i] <-  TMean_modSums[[station]]$pvalue
+  
+}
+
+write_csv(TMean_mblm, "output_data/annualLongTerm/TMean_mblmAnnual.csv")
+```
+
+
+### TRange
+
+```{r `fit regressions TRange`}
+#TRange
+
+## --------------------------
+# create list to store regression results
+TRange_modSums <- list()
+
+for (station_id in unique(TRange_slopes$FDT_STA_ID)) {
+  model_data <- TRange_slopes %>%
+    filter(FDT_STA_ID == station_id)
+    
+
+      model <- mblm(slope ~ year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      TRange_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["year", "MAD"] ,
+        pvalue = mod.sum$coefficients["year", 4]
+        )
+  }
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+TRange_mblm <- data.frame(StationID = unique(TRange_slopes$FDT_STA_ID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          variable = "TRange")
+
+for (i in 1:nrow(TRange_mblm)) {
+  station = TRange_mblm$StationID[i]
+  
+  TRange_mblm$model_slope[i] <-  TRange_modSums[[station]]$slope
+   TRange_mblm$model_MAD[i] <-  TRange_modSums[[station]]$MAD
+    TRange_mblm$model_pval[i] <-  TRange_modSums[[station]]$pvalue
+  
+}
+
+write_csv(TRange_mblm, "output_data/annualLongTerm/TRange_mblmAnnual.csv")
+```
+
+### TMax
+
+```{r `fit regressions TMax`}
+#TMax
+
+## --------------------------
+# create list to store regression results
+TMax_modSums <- list()
+
+for (station_id in unique(TMax_slopes$FDT_STA_ID)) {
+  model_data <- TMax_slopes %>%
+    filter(FDT_STA_ID == station_id)
+    
+
+      model <- mblm(slope ~ year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      TMax_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["year", "MAD"] ,
+        pvalue = mod.sum$coefficients["year", 4]
+        )
+  }
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+TMax_mblm <- data.frame(StationID = unique(TMax_slopes$FDT_STA_ID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          variable = "TMax")
+
+for (i in 1:nrow(TMax_mblm)) {
+  station = TMax_mblm$StationID[i]
+  
+  TMax_mblm$model_slope[i] <-  TMax_modSums[[station]]$slope
+   TMax_mblm$model_MAD[i] <-  TMax_modSums[[station]]$MAD
+    TMax_mblm$model_pval[i] <-  TMax_modSums[[station]]$pvalue
+  
+}
+
+write_csv(TMax_mblm, "output_data/annualLongTerm/TMax_mblmAnnual.csv")
+```
+
+### DOMin
+
+```{r `fit regressions DOMin`}
+#DOMin
+
+## --------------------------
+# create list to store regression results
+DOMin_modSums <- list()
+
+for (station_id in unique(DOMin_slopes$FDT_STA_ID)) {
+  model_data <- DOMin_slopes %>%
+    filter(FDT_STA_ID == station_id)
+    
+
+      model <- mblm(slope ~ year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      DOMin_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["year", "MAD"] ,
+        pvalue = mod.sum$coefficients["year", 4]
+        )
+  }
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+DOMin_mblm <- data.frame(StationID = unique(DOMin_slopes$FDT_STA_ID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          variable = "DOMin")
+
+for (i in 1:nrow(DOMin_mblm)) {
+  station = DOMin_mblm$StationID[i]
+  
+  DOMin_mblm$model_slope[i] <-  DOMin_modSums[[station]]$slope
+   DOMin_mblm$model_MAD[i] <-  DOMin_modSums[[station]]$MAD
+    DOMin_mblm$model_pval[i] <-  DOMin_modSums[[station]]$pvalue
+  
+}
+
+write_csv(DOMin_mblm, "output_data/annualLongTerm/DOMin_mblmAnnual.csv")
+```
+
+
+### DOMean
+
+```{r `fit regressions DOMean`}
+#DOMean
+
+## --------------------------
+# create list to store regression results
+DOMean_modSums <- list()
+
+for (station_id in unique(DOMean_slopes$FDT_STA_ID)) {
+  model_data <- DOMean_slopes %>%
+    filter(FDT_STA_ID == station_id)
+    
+
+      model <- mblm(slope ~ year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      DOMean_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["year", "MAD"] ,
+        pvalue = mod.sum$coefficients["year", 4]
+        )
+  }
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+DOMean_mblm <- data.frame(StationID = unique(DOMean_slopes$FDT_STA_ID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          variable = "DOMean")
+
+for (i in 1:nrow(DOMean_mblm)) {
+  station = DOMean_mblm$StationID[i]
+  
+  DOMean_mblm$model_slope[i] <-  DOMean_modSums[[station]]$slope
+   DOMean_mblm$model_MAD[i] <-  DOMean_modSums[[station]]$MAD
+    DOMean_mblm$model_pval[i] <-  DOMean_modSums[[station]]$pvalue
+  
+}
+
+write_csv(DOMean_mblm, "output_data/annualLongTerm/DOMean_mblmAnnual.csv")
+```
+
+
+### DORange
+
+```{r `fit regressions DORange`}
+#DORange
+
+## --------------------------
+# create list to store regression results
+DORange_modSums <- list()
+
+for (station_id in unique(DORange_slopes$FDT_STA_ID)) {
+  model_data <- DORange_slopes %>%
+    filter(FDT_STA_ID == station_id)
+    
+
+      model <- mblm(slope ~ year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      DORange_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["year", "MAD"] ,
+        pvalue = mod.sum$coefficients["year", 4]
+        )
+  }
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+DORange_mblm <- data.frame(StationID = unique(DORange_slopes$FDT_STA_ID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          variable = "DORange")
+
+for (i in 1:nrow(DORange_mblm)) {
+  station = DORange_mblm$StationID[i]
+  
+  DORange_mblm$model_slope[i] <-  DORange_modSums[[station]]$slope
+   DORange_mblm$model_MAD[i] <-  DORange_modSums[[station]]$MAD
+    DORange_mblm$model_pval[i] <-  DORange_modSums[[station]]$pvalue
+  
+}
+
+write_csv(DORange_mblm, "output_data/annualLongTerm/DORange_mblmAnnual.csv")
+```
+
+### DOMax
+
+```{r `fit regressions DOMax`}
+#DOMax
+
+## --------------------------
+# create list to store regression results
+DOMax_modSums <- list()
+
+for (station_id in unique(DOMax_slopes$FDT_STA_ID)) {
+  model_data <- DOMax_slopes %>%
+    filter(FDT_STA_ID == station_id)
+    
+
+      model <- mblm(slope ~ year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      DOMax_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["year", "MAD"] ,
+        pvalue = mod.sum$coefficients["year", 4]
+        )
+  }
+
+```
+
+
+```{r `add reg stats to summary df`}
+# create station-month key
+DOMax_mblm <- data.frame(StationID = unique(DOMax_slopes$FDT_STA_ID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          variable = "DOMax")
+
+for (i in 1:nrow(DOMax_mblm)) {
+  station = DOMax_mblm$StationID[i]
+  
+  DOMax_mblm$model_slope[i] <-  DOMax_modSums[[station]]$slope
+   DOMax_mblm$model_MAD[i] <-  DOMax_modSums[[station]]$MAD
+    DOMax_mblm$model_pval[i] <-  DOMax_modSums[[station]]$pvalue
+  
+}
+
+write_csv(DOMax_mblm, "output_data/annualLongTerm/DOMax_mblmAnnual.csv")
+```
+
+
+
+```{r}
+## Combine all mblm model results into single df
+
+varlist <- ls()
+
+myvars <- varlist[which(grepl("_mblm$", varlist))]
+
+combined_data <- do.call(rbind, lapply(myvars, function(x) {
+  get(x)
+}))
+
+write_csv(combined_data, "output_data/annualLongTerm/allVariablesCombinbed.csv")
+
+
+```
