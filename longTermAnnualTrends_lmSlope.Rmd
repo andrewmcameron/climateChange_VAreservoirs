@@ -15,7 +15,7 @@ library(tidyverse)
     As an example, the first set of relevant data in the 41-station file is from 1999 for station 2-JKS044.60.  In this year, there are monthly measurements starting May 18 through Sep 23.  You will want to calculate a slope to depict the rate of change in T and DO min, mean, max, and range.     In this case, there are 5 observations for Tmin (5.7 to 8.6) yielding a slope in C/day.  You would then calculate the same slopes for the next available year (2001).  I would suggest that we only use years in which we have a minimum of 4 observations (i.e., measurements in 4 of the 5 months).  For the surface-only stations, we only need slopes for Tmax and DOmax.
     Once we have the slopes for each year, then we can fit an mblm regression for the data from that station.
     
-This analysis effectively susbstitutes the station-year for the station-month as the unit of analysis in deriving mblm trends at the station level.
+This analysis effectively substitutes the station-year for the station-month as the unit of analysis in deriving mblm trends at the station level.
 
 
 ```{r `read in data`}
@@ -511,6 +511,28 @@ DOMax_lmslopes <- DOMax_lmslopes %>%
 slopesList[["DOMax"]] <- DOMax_lmslopes
 
 ```
+
+## All Slopes -> Single DF
+
+```{r}
+# Add field to each df in slopesList to identiy the variable used in analysis
+for (i in 1:length(slopesList)) {
+  
+  varName <- names(slopesList[i])
+  slopesList[[i]]$variable <- varName
+}
+
+
+slopes.df <- bind_rows(slopesList)
+slopes.df <- slopes.df %>%
+  select(-StationYear, -pval, -stdErr)
+
+wider_df <- slopes.df %>%
+  pivot_wider(names_from = variable, values_from = model_slope)
+
+write_csv(wider_df, "output_data/annualLongTerm/yearStation_slopeSummary.csv")
+```
+
 
 ## MBLM, seasonal rate of change ~ year
 
