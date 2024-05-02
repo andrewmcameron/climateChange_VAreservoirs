@@ -562,19 +562,21 @@ for (station_id in unique(TMin_lmslopes$StationID)) {
       TMin_modSums[[station_id]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
         )
   }
 
 ```
 
 
-```{r `add reg stats to summary df`}
+```{r `add reg stats to TMin summary df`}
 # create station-month key
 TMin_mblm <- data.frame(StationID = unique(TMin_lmslopes$StationID),
           model_slope = NA,
           model_MAD = NA,
           model_pval = NA,
+          model_intcpt = NA,
           variable = "TMin")
 
 for (i in 1:nrow(TMin_mblm)) {
@@ -583,10 +585,12 @@ for (i in 1:nrow(TMin_mblm)) {
   TMin_mblm$model_slope[i] <-  TMin_modSums[[station]]$slope
    TMin_mblm$model_MAD[i] <-  TMin_modSums[[station]]$MAD
     TMin_mblm$model_pval[i] <-  TMin_modSums[[station]]$pvalue
+     TMin_mblm$model_intcpt[i] <- TMin_modSums[[station]]$intercept
   
 }
 
-write_csv(TMin_mblm, "output_data/annualLongTerm_regressionslope/TMin_mblmAnnual.csv")
+
+#write_csv(TMin_mblm, "output_data/annualLongTerm/TMin_mblmAnnual.csv")
 ```
 
 
@@ -611,19 +615,21 @@ for (station_id in unique(TMean_lmslopes$StationID)) {
       TMean_modSums[[station_id]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
         )
   }
 
 ```
 
 
-```{r `add reg stats to summary df`}
+```{r `add reg stats to TMean summary df`}
 # create station-month key
 TMean_mblm <- data.frame(StationID = unique(TMean_lmslopes$StationID),
           model_slope = NA,
           model_MAD = NA,
           model_pval = NA,
+          model_intcpt = NA,
           variable = "TMean")
 
 for (i in 1:nrow(TMean_mblm)) {
@@ -632,12 +638,12 @@ for (i in 1:nrow(TMean_mblm)) {
   TMean_mblm$model_slope[i] <-  TMean_modSums[[station]]$slope
    TMean_mblm$model_MAD[i] <-  TMean_modSums[[station]]$MAD
     TMean_mblm$model_pval[i] <-  TMean_modSums[[station]]$pvalue
+     TMean_mblm$model_intcpt[i] <- TMean_modSums[[station]]$intercept
   
 }
 
-write_csv(TMean_mblm, "output_data/annualLongTerm_regressionslope/TMean_mblmAnnual.csv")
+#write_csv(TMean_mblm, "output_data/annualLongTerm/TMean_mblmAnnual.csv")
 ```
-
 
 ### TRange
 
@@ -660,19 +666,21 @@ for (station_id in unique(TRange_lmslopes$StationID)) {
       TRange_modSums[[station_id]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
         )
   }
 
 ```
 
 
-```{r `add reg stats to summary df`}
+```{r `add reg stats to TRange summary df`}
 # create station-month key
 TRange_mblm <- data.frame(StationID = unique(TRange_lmslopes$StationID),
           model_slope = NA,
           model_MAD = NA,
           model_pval = NA,
+          model_intcpt = NA,
           variable = "TRange")
 
 for (i in 1:nrow(TRange_mblm)) {
@@ -681,10 +689,11 @@ for (i in 1:nrow(TRange_mblm)) {
   TRange_mblm$model_slope[i] <-  TRange_modSums[[station]]$slope
    TRange_mblm$model_MAD[i] <-  TRange_modSums[[station]]$MAD
     TRange_mblm$model_pval[i] <-  TRange_modSums[[station]]$pvalue
+     TRange_mblm$model_intcpt[i] <- TRange_modSums[[station]]$intercept
   
 }
 
-write_csv(TRange_mblm, "output_data/annualLongTerm_regressionslope/TRange_mblmAnnual.csv")
+#write_csv(TRange_mblm, "output_data/annualLongTerm/TRange_mblmAnnual.csv")
 ```
 
 
@@ -709,19 +718,21 @@ for (station_id in unique(TMax_lmslopes$StationID)) {
       TMax_modSums[[station_id]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
         )
   }
 
 ```
 
 
-```{r `add reg stats to summary df`}
+```{r `add reg stats to TMax summary df`}
 # create station-month key
 TMax_mblm <- data.frame(StationID = unique(TMax_lmslopes$StationID),
           model_slope = NA,
           model_MAD = NA,
           model_pval = NA,
+          model_intcpt = NA,
           variable = "TMax")
 
 for (i in 1:nrow(TMax_mblm)) {
@@ -730,12 +741,12 @@ for (i in 1:nrow(TMax_mblm)) {
   TMax_mblm$model_slope[i] <-  TMax_modSums[[station]]$slope
    TMax_mblm$model_MAD[i] <-  TMax_modSums[[station]]$MAD
     TMax_mblm$model_pval[i] <-  TMax_modSums[[station]]$pvalue
+     TMax_mblm$model_intcpt[i] <- TMax_modSums[[station]]$intercept
   
 }
 
-write_csv(TMax_mblm, "output_data/annualLongTerm_regressionslope/TMax_mblmAnnual.csv")
+#write_csv(TMax_mblm, "output_data/annualLongTerm/TMax_mblmAnnual.csv")
 ```
-
 
 ### DOMin
 
@@ -758,19 +769,21 @@ for (station_id in unique(DOMin_lmslopes$StationID)) {
       DOMin_modSums[[station_id]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
         )
   }
 
 ```
 
 
-```{r `add reg stats to summary df`}
+```{r `add reg stats to DOMin summary df`}
 # create station-month key
 DOMin_mblm <- data.frame(StationID = unique(DOMin_lmslopes$StationID),
           model_slope = NA,
           model_MAD = NA,
           model_pval = NA,
+          model_intcpt = NA,
           variable = "DOMin")
 
 for (i in 1:nrow(DOMin_mblm)) {
@@ -779,12 +792,12 @@ for (i in 1:nrow(DOMin_mblm)) {
   DOMin_mblm$model_slope[i] <-  DOMin_modSums[[station]]$slope
    DOMin_mblm$model_MAD[i] <-  DOMin_modSums[[station]]$MAD
     DOMin_mblm$model_pval[i] <-  DOMin_modSums[[station]]$pvalue
+     DOMin_mblm$model_intcpt[i] <- DOMin_modSums[[station]]$intercept
   
 }
 
-write_csv(DOMin_mblm, "output_data/annualLongTerm_regressionslope/DOMin_mblmAnnual.csv")
+#write_csv(DOMin_mblm, "output_data/annualLongTerm/DOMin_mblmAnnual.csv")
 ```
-
 
 
 ### DOMean
@@ -808,19 +821,21 @@ for (station_id in unique(DOMean_lmslopes$StationID)) {
       DOMean_modSums[[station_id]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
         )
   }
 
 ```
 
 
-```{r `add reg stats to summary df`}
+```{r `add reg stats to DOMean summary df`}
 # create station-month key
 DOMean_mblm <- data.frame(StationID = unique(DOMean_lmslopes$StationID),
           model_slope = NA,
           model_MAD = NA,
           model_pval = NA,
+          model_intcpt = NA,
           variable = "DOMean")
 
 for (i in 1:nrow(DOMean_mblm)) {
@@ -829,10 +844,11 @@ for (i in 1:nrow(DOMean_mblm)) {
   DOMean_mblm$model_slope[i] <-  DOMean_modSums[[station]]$slope
    DOMean_mblm$model_MAD[i] <-  DOMean_modSums[[station]]$MAD
     DOMean_mblm$model_pval[i] <-  DOMean_modSums[[station]]$pvalue
+     DOMean_mblm$model_intcpt[i] <- DOMean_modSums[[station]]$intercept
   
 }
 
-write_csv(DOMean_mblm, "output_data/annualLongTerm_regressionslope/DOMean_mblmAnnual.csv")
+#write_csv(DOMean_mblm, "output_data/annualLongTerm/DOMean_mblmAnnual.csv")
 ```
 
 
@@ -857,19 +873,21 @@ for (station_id in unique(DORange_lmslopes$StationID)) {
       DORange_modSums[[station_id]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
         )
   }
 
 ```
 
 
-```{r `add reg stats to summary df`}
+```{r `add reg stats to DORange summary df`}
 # create station-month key
 DORange_mblm <- data.frame(StationID = unique(DORange_lmslopes$StationID),
           model_slope = NA,
           model_MAD = NA,
           model_pval = NA,
+          model_intcpt = NA,
           variable = "DORange")
 
 for (i in 1:nrow(DORange_mblm)) {
@@ -878,13 +896,12 @@ for (i in 1:nrow(DORange_mblm)) {
   DORange_mblm$model_slope[i] <-  DORange_modSums[[station]]$slope
    DORange_mblm$model_MAD[i] <-  DORange_modSums[[station]]$MAD
     DORange_mblm$model_pval[i] <-  DORange_modSums[[station]]$pvalue
+     DORange_mblm$model_intcpt[i] <- DORange_modSums[[station]]$intercept
   
 }
 
-write_csv(DORange_mblm, "output_data/annualLongTerm_regressionslope/DORange_mblmAnnual.csv")
+#write_csv(DORange_mblm, "output_data/annualLongTerm/DORange_mblmAnnual.csv")
 ```
-
-
 
 ### DOMax
 
@@ -907,19 +924,21 @@ for (station_id in unique(DOMax_lmslopes$StationID)) {
       DOMax_modSums[[station_id]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
         )
   }
 
 ```
 
 
-```{r `add reg stats to summary df`}
+```{r `add reg stats to DOMax summary df`}
 # create station-month key
 DOMax_mblm <- data.frame(StationID = unique(DOMax_lmslopes$StationID),
           model_slope = NA,
           model_MAD = NA,
           model_pval = NA,
+          model_intcpt = NA,
           variable = "DOMax")
 
 for (i in 1:nrow(DOMax_mblm)) {
@@ -928,10 +947,11 @@ for (i in 1:nrow(DOMax_mblm)) {
   DOMax_mblm$model_slope[i] <-  DOMax_modSums[[station]]$slope
    DOMax_mblm$model_MAD[i] <-  DOMax_modSums[[station]]$MAD
     DOMax_mblm$model_pval[i] <-  DOMax_modSums[[station]]$pvalue
+     DOMax_mblm$model_intcpt[i] <- DOMax_modSums[[station]]$intercept
   
 }
 
-write_csv(DOMax_mblm, "output_data/annualLongTerm_regressionslope/DOMax_mblmAnnual.csv")
+#write_csv(DOMax_mblm, "output_data/annualLongTerm/DOMax_mblmAnnual.csv")
 ```
 
 
@@ -946,7 +966,104 @@ combined_data <- do.call(rbind, lapply(myvars, function(x) {
   get(x)
 }))
 
-write_csv(combined_data, "output_data/annualLongTerm_regressionslope/allVariablesCombinbed.csv")
+# write_csv(combined_data, "output_data/annualLongTerm/allVariablesCombinbed.csv")
 
+```
+
+## Data Viz: mblm slopes for all stations, by variable
+
+```{r}
+# geom_line has no 'mblm' formula option; abline is the work around.
+# but abline has no axis values associated, it is just an infinite line based on slope and intercept.
+# effectively plotting the mblm lines thus requires a geom_ layer to define the scales. 
+
+# also, field to color lines by slope significance must be added
+mblm_data <- combined_data %>%
+  mutate(significant = if_else(model_pval <= .05 & model_slope > 0, "significant positive", 
+                               if_else(model_pval <= .05 & model_slope < 0, "significant negative", "not significant"))
+         ) %>%
+  mutate(var_class = ifelse(startsWith(variable, "T"), "Temperature", "Dissolved Oxygen")) %>%
+  mutate(var_type = case_when(
+    endsWith(variable, "Max") ~ "Max",
+    endsWith(variable, "Min") ~ "Min",
+    endsWith(variable, "Range") ~ "Range",
+    endsWith(variable, "Mean") ~ "Mean",
+    TRUE ~ ""
+  ))
+
+# set significant as factor to ensure sig lines sit on top of insignificant lines
+mblm_data$significant <- factor(mblm_data$significant, levels = c("significant positive", "significant negative", "not significant"))
+
+# point plotting variable -- new var name so that it can be modified to remove outliers as needed without affecting the original data frame
+annualTrends.df <- slopes.df
+
+## The following was iterative, based on plotting and replotting using facet_grid and visually asessing the plots. For some reason scale = "free" did not actually allow for free scales, such that each row (and col?)
+# Remove outlier from TMAx to tighten the y axis range.
+xoutlier <- annualTrends.df %>%
+  filter(variable == "TMax") %>%
+  summarize(min = min(model_slope))
+
+outlier_index <- which(annualTrends.df$model_slope == xoutlier$min & annualTrends.df$variable == "TMax")
+
+annualTrends.df$model_slope[outlier_index] <- NA
+
+# Remove max and min from TRange
+xoutlier <- annualTrends.df %>%
+  filter(variable == "TRange") %>%
+  summarize(min = min(model_slope),
+            max = max(model_slope))
+
+outlier_indices <- which((annualTrends.df$model_slope == xoutlier$min | annualTrends.df$model_slope == xoutlier$max) & annualTrends.df$variable == "TRange")
+
+annualTrends.df$model_slope[outlier_indices] <- NA
+
+```
+
+
+```{r}
+
+plot <- ggplot() +
+  geom_point(data = annualTrends.df, aes(x = Year, y = model_slope), alpha = 0) +
+  geom_abline(data = mblm_data, aes(intercept = model_intcpt, slope = model_slope, color = significant), 
+              linewidth = .42, alpha = .6) +
+   labs(title = NULL,
+       x = "Year",
+       y = NULL) +  
+  facet_grid(var_class ~ var_type, scales = "free",
+             labeller = labeller(var_class = as_labeller(c("Dissolved Oxygen" = "Dissolved Oxygen (mg 02/L/day)", "Temperature" = "Temperature (C/day)")))) +
+  scale_color_manual(values = c("not significant" = "grey72", 
+                                "significant positive" = "#C9A818", 
+                                "significant negative" = "#124E78")) +
+  theme_minimal() + 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),
+        axis.title = element_text(size = 14), 
+        axis.text = element_text(size = 9.5), 
+        axis.text.x = element_text(angle = 45, hjust = .8),
+        legend.text = element_text(size = 8),  
+        legend.title = element_blank(),
+        strip.text = element_text(size = 11),
+        panel.grid = element_line(color = "grey90", linewidth = .1))
+
+plot(plot)
+ggsave("annualLongterm_plot.jpg", plot)
+
+# Custom labels after creating plot using `grid` package
+## Create grob object
+
+# define my label positions and text
+y_temp <- 0.2
+y_do <- 0.7
+lab_temp <- "°C/day"
+lab_do <- "mg 02/L/d"
+rot = 90
+grid.text(lab_temp, x = 0, y = y_temp, rot = 90, gp=gpar(fontsize=20, col="grey"))
+
+
+
+
+# Draw the modified plot
+x <- grid::grid.draw(pgrob, recording = TRUE)
 
 ```
