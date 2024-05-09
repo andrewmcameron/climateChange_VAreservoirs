@@ -1,0 +1,156 @@
+---
+title: "Long-Term Annual Trends in T & DO (May to Aug)"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+    Re-do long term annual trends calculations using May-Aug slopes instead of May-Sep slopes (for both T and DO, though I think the DO data will be less sensitive to this effect).
+    filter these data to select years for which we have both May and Aug values, and at least one of June or July (i.e., a minimum of 3 values to determine the slope and must include May and Aug).  
+    
+```{r `read in data`}
+trendSites.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
+allData.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3)
+
+# Convert `date` column from Excel encoded date to a more legible date format. Otherwise date shows as numeric value, e.g. '44230'.
+    allData.df$Date <- allData.df$Date * 86400      # 86400 = seconds in a day.
+    allData.df$Date <- as.POSIXct(allData.df$Date, origin = "1899-12-30", tz = "UTC")
+    
+```
+
+```{r 'remove anomlies'}
+# a surface temperature (Tmax) of 2.8 C in August
+# 13774 	6ACNR000.00 	8/28/1990 	0.3 	NA 	NA 	NA 	NA
+
+which(grepl("13774", allData.df$X1))
+allData.df[13770, (5:8)] <- NA
+
+```
+# Data Filtering and Subsetting
+
+```{r `subset data for APR-AUG`}
+# filter for rows corresponding to the 41 stations
+station_IDS <- trendSites.df$FDT_STA_ID
+
+surfaceOnly_IDs <- c("2-JKS053.48",
+                    "2-XDD000.40",
+                    "4AROA192.55",
+                    "4AROA196.05",
+                    "5ASRN000.66",
+                    "6ACNR000.00",
+                    "6APNR008.15") # only surface water measurements ever taken
+
+# Apr to August only; reservoirs are cooling by Oct
+subset.df <- allData.df %>%
+  mutate(MonthNum = lubridate::month(Date)) %>%  
+  filter(FDT_STA_ID %in% station_IDS) %>%
+  filter(MonthNum %in% 4:8) %>%
+  filter(year(Date) >= 1999) %>%
+  mutate(stationYear = paste0(FDT_STA_ID,"-", as.character(year(Date))))
+
+# Identify station years lacking April or August observations
+AprAugust_present <- subset.df %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(Apr_obs = any(lubridate::month(Date) == 4),
+            Aug_obs = any(lubridate::month(Date) == 8)) %>%
+  filter(Apr_obs == TRUE & Aug_obs == TRUE) %>%
+  mutate(staYear = paste0(FDT_STA_ID, "-", `year(Date)`)) # Create station-year field to facilitate filtering
+  
+staYrs_AprAug <- AprAugust_present$staYear
+
+data_AprAug <- subset.df %>%
+  filter(stationYear %in% staYrs_AprAug)
+
+```
+
+
+# Apr to August Modelling
+
+Variable-by-variable filtering must be done to eliminate station-years where Nobs < 3. Some station-years that passed initial filter above nevertheless lack 4 or more observations for specific variables.
+
+```{r `slopes list`}
+slopesList <- list()
+
+```
+
+## Min, Mean, Range slopes
+
+**Exclude surface-only stations from these analyses** 
+
+### Temp
+
+```{r}
+# TMin
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+TMin_Nobs <- data_AprAug %>%
+  group_by(stationYear) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(TMin)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  select(stationYear,validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 3 Nobs
+TMin_insufNobs  <- TMin_Nobs %>%
+  filter(validObs < 3)
+
+TMin_data <- subset.df %>%
+  select(FDT_STA_ID, TMin, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% TMin_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs)
+
+# Identify station years lacking Apr or August observations
+AprAug_present_tmin <- TMin_data %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(Apr_obs = any(lubridate::month(Date) == 4),
+            Aug_obs = any(lubridate::month(Date) == 8)) %>%
+  filter(Apr_obs == TRUE & Aug_obs == TRUE) %>%
+  mutate(stationYear = paste0(FDT_STA_ID, "-", `year(Date)`)) %>% # Create station-year field to facilitate filtering
+  ungroup()
+
+staYrs_TMin <- AprAug_present_tmin$stationYear
+
+TMin_data <- TMin_data %>%
+  filter(stationYear %in% staYrs_TMin)
+
+```
+
+```{r}
+# df to hold model slopes
+TMin_lmslopes_ma <- data.frame(StationYear = unique(TMin_data_ma$stationYear),
+                          model_slope = NA,
+                          pval = NA,
+                          stdErr = NA)
+
+
+for (sy in unique(TMin_data$stationYear)) {
+  model_data <- TMin_data %>%
+    filter(stationYear == sy)
+  
+  model <- lm(TMin ~ DOY, data = model_data)
+  modsum <- summary(model)
+  
+  TMin_lmslopes[TMin_lmslopes$StationYear == sy, 2] <- modsum$coefficients[2, 1]
+  TMin_lmslopes[TMin_lmslopes$StationYear == sy, 3] <- modsum$coefficients[2, 4]
+  TMin_lmslopes[TMin_lmslopes$StationYear == sy, 4] <- modsum$coefficients[2, 2]
+  
+}
+
+TMin_lmslopes <- TMin_lmslopes %>%
+  mutate(Year = as.numeric(sub(".*-", "", StationYear))) %>%
+  mutate(StationID = sub("-[0-9]{4}$", "", StationYear))
+
+slopesList[["TMin"]] <- TMin_lmslopes
+
+```
+
+
+Total Station-Years
+
+May-August  (May & Aug obs >= 3 obs)
+TMin - 610
+T

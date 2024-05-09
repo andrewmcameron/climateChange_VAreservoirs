@@ -1,5 +1,5 @@
 ---
-title: "Long-Term Annual Trends in T & DO"
+title: "Long-Term Annual Trends in T & DO (May to Sept)"
 output: html_document
 ---
 
@@ -16,7 +16,6 @@ library(tidyverse)
     Once we have the slopes for each year, then we can fit an mblm regression for the data from that station.
     
 This analysis effectively substitutes the station-year for the station-month as the unit of analysis in deriving mblm trends at the station level.
-
 
 ```{r `read in data`}
 trendSites.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
