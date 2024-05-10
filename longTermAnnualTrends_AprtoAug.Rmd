@@ -1,5 +1,5 @@
 ---
-title: "Long-Term Annual Trends in T & DO (May to Aug)"
+title: "Long-Term Annual Trends in T & DO (Apr to Aug)"
 output: html_document
 ---
 
@@ -8,8 +8,6 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 ```
 
-    Re-do long term annual trends calculations using May-Aug slopes instead of May-Sep slopes (for both T and DO, though I think the DO data will be less sensitive to this effect).
-    filter these data to select years for which we have both May and Aug values, and at least one of June or July (i.e., a minimum of 3 values to determine the slope and must include May and Aug).  
     
 ```{r `read in data`}
 trendSites.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
@@ -69,6 +67,8 @@ data_AprAug <- subset.df %>%
 
 # Apr to August Modelling
 
+## Linear Regression, `variable ~ DOY` by Station-Year
+
 Variable-by-variable filtering must be done to eliminate station-years where Nobs < 3. Some station-years that passed initial filter above nevertheless lack 4 or more observations for specific variables.
 
 ```{r `slopes list`}
@@ -76,11 +76,11 @@ slopesList <- list()
 
 ```
 
-## Min, Mean, Range slopes
+### Min, Mean, Range slopes
 
 **Exclude surface-only stations from these analyses** 
 
-### Temp
+#### Temp
 
 ```{r}
 # TMin
@@ -121,7 +121,7 @@ TMin_data <- TMin_data %>%
 
 ```{r}
 # df to hold model slopes
-TMin_lmslopes_ma <- data.frame(StationYear = unique(TMin_data_ma$stationYear),
+TMin_lmslopes <- data.frame(StationYear = unique(TMin_data$stationYear),
                           model_slope = NA,
                           pval = NA,
                           stdErr = NA)
@@ -141,16 +141,1047 @@ for (sy in unique(TMin_data$stationYear)) {
 }
 
 TMin_lmslopes <- TMin_lmslopes %>%
-  mutate(Year = as.numeric(sub(".*-", "", StationYear))) %>%
-  mutate(StationID = sub("-[0-9]{4}$", "", StationYear))
+  mutate(Year = as.numeric(sub(".*-", "", StationYear))) %>%   #  ".*-" will match any sequence of characters followed by a hyphen (i.e., the station ID) 
+  mutate(StationID = sub("-[0-9]{4}$", "", StationYear)) # "-[0-9]{4}$" will match a hyphen followed by exactly four digits at the end of the string (i.e., the year)
 
 slopesList[["TMin"]] <- TMin_lmslopes
 
 ```
 
+```{r}
+# TMean
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+TMean_Nobs <- data_AprAug %>%
+  group_by(stationYear) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(TMean)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  select(stationYear,validObs) %>%
+  ungroup()
 
-Total Station-Years
+# Identify station-years w/ fewer than 3 Nobs
+TMean_insufNobs  <- TMean_Nobs %>%
+  filter(validObs < 3)
 
-May-August  (May & Aug obs >= 3 obs)
-TMin - 610
-T
+TMean_data <- subset.df %>%
+  select(FDT_STA_ID, TMean, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% TMean_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs)
+
+# Identify station years lacking Apr or August observations
+AprAug_present_TMean <- TMean_data %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(Apr_obs = any(lubridate::month(Date) == 4),
+            Aug_obs = any(lubridate::month(Date) == 8)) %>%
+  filter(Apr_obs == TRUE & Aug_obs == TRUE) %>%
+  mutate(stationYear = paste0(FDT_STA_ID, "-", `year(Date)`)) %>% # Create station-year field to facilitate filtering
+  ungroup()
+
+staYrs_TMean <- AprAug_present_TMean$stationYear
+
+TMean_data <- TMean_data %>%
+  filter(stationYear %in% staYrs_TMean)
+
+```
+
+```{r}
+# df to hold model slopes
+TMean_lmslopes <- data.frame(StationYear = unique(TMean_data$stationYear),
+                          model_slope = NA,
+                          pval = NA,
+                          stdErr = NA)
+
+
+for (sy in unique(TMean_data$stationYear)) {
+  model_data <- TMean_data %>%
+    filter(stationYear == sy)
+  
+  model <- lm(TMean ~ DOY, data = model_data)
+  modsum <- summary(model)
+  
+  TMean_lmslopes[TMean_lmslopes$StationYear == sy, 2] <- modsum$coefficients[2, 1]
+  TMean_lmslopes[TMean_lmslopes$StationYear == sy, 3] <- modsum$coefficients[2, 4]
+  TMean_lmslopes[TMean_lmslopes$StationYear == sy, 4] <- modsum$coefficients[2, 2]
+  
+}
+
+TMean_lmslopes <- TMean_lmslopes %>%
+  mutate(Year = as.numeric(sub(".*-", "", StationYear))) %>%   #  ".*-" will match any sequence of characters followed by a hyphen (i.e., the station ID) 
+  mutate(StationID = sub("-[0-9]{4}$", "", StationYear)) # "-[0-9]{4}$" will match a hyphen followed by exactly four digits at the end of the string (i.e., the year)
+
+slopesList[["TMean"]] <- TMean_lmslopes
+
+```
+
+
+```{r}
+# TRange
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+TRange_Nobs <- data_AprAug %>%
+  group_by(stationYear) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(TRange)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  select(stationYear,validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 3 Nobs
+TRange_insufNobs  <- TRange_Nobs %>%
+  filter(validObs < 3)
+
+TRange_data <- subset.df %>%
+  select(FDT_STA_ID, TRange, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% TRange_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs)
+
+# Identify station years lacking Apr or August observations
+AprAug_present_TRange <- TRange_data %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(Apr_obs = any(lubridate::month(Date) == 4),
+            Aug_obs = any(lubridate::month(Date) == 8)) %>%
+  filter(Apr_obs == TRUE & Aug_obs == TRUE) %>%
+  mutate(stationYear = paste0(FDT_STA_ID, "-", `year(Date)`)) %>% # Create station-year field to facilitate filtering
+  ungroup()
+
+staYrs_TRange <- AprAug_present_TRange$stationYear
+
+TRange_data <- TRange_data %>%
+  filter(stationYear %in% staYrs_TRange)
+
+```
+
+```{r}
+# df to hold model slopes
+TRange_lmslopes <- data.frame(StationYear = unique(TRange_data$stationYear),
+                          model_slope = NA,
+                          pval = NA,
+                          stdErr = NA)
+
+
+for (sy in unique(TRange_data$stationYear)) {
+  model_data <- TRange_data %>%
+    filter(stationYear == sy)
+  
+  model <- lm(TRange ~ DOY, data = model_data)
+  modsum <- summary(model)
+  
+  TRange_lmslopes[TRange_lmslopes$StationYear == sy, 2] <- modsum$coefficients[2, 1]
+  TRange_lmslopes[TRange_lmslopes$StationYear == sy, 3] <- modsum$coefficients[2, 4]
+  TRange_lmslopes[TRange_lmslopes$StationYear == sy, 4] <- modsum$coefficients[2, 2]
+  
+}
+
+TRange_lmslopes <- TRange_lmslopes %>%
+  mutate(Year = as.numeric(sub(".*-", "", StationYear))) %>%   #  ".*-" will match any sequence of characters followed by a hyphen (i.e., the station ID) 
+  mutate(StationID = sub("-[0-9]{4}$", "", StationYear)) # "-[0-9]{4}$" will match a hyphen followed by exactly four digits at the end of the string (i.e., the year)
+
+slopesList[["TRange"]] <- TRange_lmslopes
+
+```
+
+#### Dissolved Oxygen
+
+```{r}
+# DOMin
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+DOMin_Nobs <- data_AprAug %>%
+  group_by(stationYear) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(DOMin)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  select(stationYear,validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 3 Nobs
+DOMin_insufNobs  <- DOMin_Nobs %>%
+  filter(validObs < 3)
+
+DOMin_data <- subset.df %>%
+  select(FDT_STA_ID, DOMin, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% DOMin_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs)
+
+# Identify station years lacking Apr or August observations
+AprAug_present_DOMin <- DOMin_data %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(Apr_obs = any(lubridate::month(Date) == 4),
+            Aug_obs = any(lubridate::month(Date) == 8)) %>%
+  filter(Apr_obs == TRUE & Aug_obs == TRUE) %>%
+  mutate(stationYear = paste0(FDT_STA_ID, "-", `year(Date)`)) %>% # Create station-year field to facilitate filtering
+  ungroup()
+
+staYrs_DOMin <- AprAug_present_DOMin$stationYear
+
+DOMin_data <- DOMin_data %>%
+  filter(stationYear %in% staYrs_DOMin)
+
+```
+
+```{r}
+# df to hold model slopes
+DOMin_lmslopes <- data.frame(StationYear = unique(DOMin_data$stationYear),
+                          model_slope = NA,
+                          pval = NA,
+                          stdErr = NA)
+
+
+for (sy in unique(DOMin_data$stationYear)) {
+  model_data <- DOMin_data %>%
+    filter(stationYear == sy)
+  
+  model <- lm(DOMin ~ DOY, data = model_data)
+  modsum <- summary(model)
+  
+  DOMin_lmslopes[DOMin_lmslopes$StationYear == sy, 2] <- modsum$coefficients[2, 1]
+  DOMin_lmslopes[DOMin_lmslopes$StationYear == sy, 3] <- modsum$coefficients[2, 4]
+  DOMin_lmslopes[DOMin_lmslopes$StationYear == sy, 4] <- modsum$coefficients[2, 2]
+  
+}
+
+DOMin_lmslopes <- DOMin_lmslopes %>%
+  mutate(Year = as.numeric(sub(".*-", "", StationYear))) %>%   #  ".*-" will match any sequence of characters followed by a hyphen (i.e., the station ID) 
+  mutate(StationID = sub("-[0-9]{4}$", "", StationYear)) # "-[0-9]{4}$" will match a hyphen followed by exactly four digits at the end of the string (i.e., the year)
+
+slopesList[["DOMin"]] <- DOMin_lmslopes
+
+```
+
+```{r}
+# DOMean
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+DOMean_Nobs <- data_AprAug %>%
+  group_by(stationYear) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(DOMean)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  select(stationYear,validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 3 Nobs
+DOMean_insufNobs  <- DOMean_Nobs %>%
+  filter(validObs < 3)
+
+DOMean_data <- subset.df %>%
+  select(FDT_STA_ID, DOMean, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% DOMean_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs)
+
+# Identify station years lacking Apr or August observations
+AprAug_present_DOMean <- DOMean_data %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(Apr_obs = any(lubridate::month(Date) == 4),
+            Aug_obs = any(lubridate::month(Date) == 8)) %>%
+  filter(Apr_obs == TRUE & Aug_obs == TRUE) %>%
+  mutate(stationYear = paste0(FDT_STA_ID, "-", `year(Date)`)) %>% # Create station-year field to facilitate filtering
+  ungroup()
+
+staYrs_DOMean <- AprAug_present_DOMean$stationYear
+
+DOMean_data <- DOMean_data %>%
+  filter(stationYear %in% staYrs_DOMean)
+
+```
+
+```{r}
+# df to hold model slopes
+DOMean_lmslopes <- data.frame(StationYear = unique(DOMean_data$stationYear),
+                          model_slope = NA,
+                          pval = NA,
+                          stdErr = NA)
+
+
+for (sy in unique(DOMean_data$stationYear)) {
+  model_data <- DOMean_data %>%
+    filter(stationYear == sy)
+  
+  model <- lm(DOMean ~ DOY, data = model_data)
+  modsum <- summary(model)
+  
+  DOMean_lmslopes[DOMean_lmslopes$StationYear == sy, 2] <- modsum$coefficients[2, 1]
+  DOMean_lmslopes[DOMean_lmslopes$StationYear == sy, 3] <- modsum$coefficients[2, 4]
+  DOMean_lmslopes[DOMean_lmslopes$StationYear == sy, 4] <- modsum$coefficients[2, 2]
+  
+}
+
+DOMean_lmslopes <- DOMean_lmslopes %>%
+  mutate(Year = as.numeric(sub(".*-", "", StationYear))) %>%   #  ".*-" will match any sequence of characters followed by a hyphen (i.e., the station ID) 
+  mutate(StationID = sub("-[0-9]{4}$", "", StationYear)) # "-[0-9]{4}$" will match a hyphen followed by exactly four digits at the end of the string (i.e., the year)
+
+slopesList[["DOMean"]] <- DOMean_lmslopes
+
+```
+
+```{r}
+# DORange
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+DORange_Nobs <- data_AprAug %>%
+  group_by(stationYear) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(DORange)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  select(stationYear,validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 3 Nobs
+DORange_insufNobs  <- DORange_Nobs %>%
+  filter(validObs < 3)
+
+DORange_data <- subset.df %>%
+  select(FDT_STA_ID, DORange, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% DORange_insufNobs$stationYear) %>%
+  filter(!FDT_STA_ID %in% surfaceOnly_IDs)
+
+# Identify station years lacking Apr or August observations
+AprAug_present_DORange <- DORange_data %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(Apr_obs = any(lubridate::month(Date) == 4),
+            Aug_obs = any(lubridate::month(Date) == 8)) %>%
+  filter(Apr_obs == TRUE & Aug_obs == TRUE) %>%
+  mutate(stationYear = paste0(FDT_STA_ID, "-", `year(Date)`)) %>% # Create station-year field to facilitate filtering
+  ungroup()
+
+staYrs_DORange <- AprAug_present_DORange$stationYear
+
+DORange_data <- DORange_data %>%
+  filter(stationYear %in% staYrs_DORange)
+
+```
+
+```{r}
+# df to hold model slopes
+DORange_lmslopes <- data.frame(StationYear = unique(DORange_data$stationYear),
+                          model_slope = NA,
+                          pval = NA,
+                          stdErr = NA)
+
+
+for (sy in unique(DORange_data$stationYear)) {
+  model_data <- DORange_data %>%
+    filter(stationYear == sy)
+  
+  model <- lm(DORange ~ DOY, data = model_data)
+  modsum <- summary(model)
+  
+  DORange_lmslopes[DORange_lmslopes$StationYear == sy, 2] <- modsum$coefficients[2, 1]
+  DORange_lmslopes[DORange_lmslopes$StationYear == sy, 3] <- modsum$coefficients[2, 4]
+  DORange_lmslopes[DORange_lmslopes$StationYear == sy, 4] <- modsum$coefficients[2, 2]
+  
+}
+
+DORange_lmslopes <- DORange_lmslopes %>%
+  mutate(Year = as.numeric(sub(".*-", "", StationYear))) %>%   #  ".*-" will match any sequence of characters followed by a hyphen (i.e., the station ID) 
+  mutate(StationID = sub("-[0-9]{4}$", "", StationYear)) # "-[0-9]{4}$" will match a hyphen followed by exactly four digits at the end of the string (i.e., the year)
+
+slopesList[["DORange"]] <- DORange_lmslopes
+
+```
+
+### TMax and DOMax slopes
+
+Include surface only stations
+
+```{r}
+# TMax
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+TMax_Nobs <- data_AprAug %>%
+  group_by(stationYear) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(TMax)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  select(stationYear,validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 3 Nobs
+TMax_insufNobs  <- TMax_Nobs %>%
+  filter(validObs < 3)
+
+TMax_data <- subset.df %>%
+  select(FDT_STA_ID, TMax, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% TMax_insufNobs$stationYear)
+
+# Identify station years lacking Apr or August observations
+AprAug_present_TMax <- TMax_data %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(Apr_obs = any(lubridate::month(Date) == 4),
+            Aug_obs = any(lubridate::month(Date) == 8)) %>%
+  filter(Apr_obs == TRUE & Aug_obs == TRUE) %>%
+  mutate(stationYear = paste0(FDT_STA_ID, "-", `year(Date)`)) %>% # Create station-year field to facilitate filtering
+  ungroup()
+
+staYrs_TMax <- AprAug_present_TMax$stationYear
+
+TMax_data <- TMax_data %>%
+  filter(stationYear %in% staYrs_TMax)
+
+```
+
+```{r}
+# df to hold model slopes
+TMax_lmslopes <- data.frame(StationYear = unique(TMax_data$stationYear),
+                          model_slope = NA,
+                          pval = NA,
+                          stdErr = NA)
+
+
+for (sy in unique(TMax_data$stationYear)) {
+  model_data <- TMax_data %>%
+    filter(stationYear == sy)
+  
+  model <- lm(TMax ~ DOY, data = model_data)
+  modsum <- summary(model)
+  
+  TMax_lmslopes[TMax_lmslopes$StationYear == sy, 2] <- modsum$coefficients[2, 1]
+  TMax_lmslopes[TMax_lmslopes$StationYear == sy, 3] <- modsum$coefficients[2, 4]
+  TMax_lmslopes[TMax_lmslopes$StationYear == sy, 4] <- modsum$coefficients[2, 2]
+  
+}
+
+TMax_lmslopes <- TMax_lmslopes %>%
+  mutate(Year = as.numeric(sub(".*-", "", StationYear))) %>%   #  ".*-" will match any sequence of characters followed by a hyphen (i.e., the station ID) 
+  mutate(StationID = sub("-[0-9]{4}$", "", StationYear)) # "-[0-9]{4}$" will match a hyphen followed by exactly four digits at the end of the string (i.e., the year)
+
+slopesList[["TMax"]] <- TMax_lmslopes
+
+```
+
+```{r}
+# DOMax
+## --------------------------------------------
+# Derive valid Nobs for each station-year
+DOMax_Nobs <- data_AprAug %>%
+  group_by(stationYear) %>%
+  summarize(n(),
+            NA_count = length(which(is.na(DOMax)))) %>%
+  mutate(validObs = `n()` - NA_count) %>%
+  select(stationYear,validObs) %>%
+  ungroup()
+
+# Identify station-years w/ fewer than 3 Nobs
+DOMax_insufNobs  <- DOMax_Nobs %>%
+  filter(validObs < 3)
+
+DOMax_data <- subset.df %>%
+  select(FDT_STA_ID, DOMax, DOY, Date, stationYear) %>%
+  filter(!stationYear %in% DOMax_insufNobs$stationYear)
+
+# Identify station years lacking Apr or August observations
+AprAug_present_DOMax <- DOMax_data %>%
+  group_by(FDT_STA_ID, year(Date)) %>%
+  summarize(Apr_obs = any(lubridate::month(Date) == 4),
+            Aug_obs = any(lubridate::month(Date) == 8)) %>%
+  filter(Apr_obs == TRUE & Aug_obs == TRUE) %>%
+  mutate(stationYear = paste0(FDT_STA_ID, "-", `year(Date)`)) %>% # Create station-year field to facilitate filtering
+  ungroup()
+
+staYrs_DOMax <- AprAug_present_DOMax$stationYear
+
+DOMax_data <- DOMax_data %>%
+  filter(stationYear %in% staYrs_DOMax)
+
+```
+
+```{r}
+# df to hold model slopes
+DOMax_lmslopes <- data.frame(StationYear = unique(DOMax_data$stationYear),
+                          model_slope = NA,
+                          pval = NA,
+                          stdErr = NA)
+
+
+for (sy in unique(DOMax_data$stationYear)) {
+  model_data <- DOMax_data %>%
+    filter(stationYear == sy)
+  
+  model <- lm(DOMax ~ DOY, data = model_data)
+  modsum <- summary(model)
+  
+  DOMax_lmslopes[DOMax_lmslopes$StationYear == sy, 2] <- modsum$coefficients[2, 1]
+  DOMax_lmslopes[DOMax_lmslopes$StationYear == sy, 3] <- modsum$coefficients[2, 4]
+  DOMax_lmslopes[DOMax_lmslopes$StationYear == sy, 4] <- modsum$coefficients[2, 2]
+  
+}
+
+DOMax_lmslopes <- DOMax_lmslopes %>%
+  mutate(Year = as.numeric(sub(".*-", "", StationYear))) %>%   #  ".*-" will match any sequence of characters followed by a hyphen (i.e., the station ID) 
+  mutate(StationID = sub("-[0-9]{4}$", "", StationYear)) # "-[0-9]{4}$" will match a hyphen followed by exactly four digits at the end of the string (i.e., the year)
+
+slopesList[["DOMax"]] <- DOMax_lmslopes
+
+```
+
+## All Slopes -> Single DF
+
+```{r}
+# Add field to each df in slopesList to identiy the variable used in analysis
+for (i in 1:length(slopesList)) {
+  
+  varName <- names(slopesList[i])
+  slopesList[[i]]$variable <- varName
+}
+
+
+slopes.df <- bind_rows(slopesList)
+slopes.df <- slopes.df %>%
+  select(-StationYear, -pval, -stdErr)
+
+wider_df <- slopes.df %>%
+  pivot_wider(names_from = variable, values_from = model_slope)
+
+write_csv(wider_df, "output_data/annualLongTerm/yearStation_slopeSummary_AprAug.csv")
+```
+
+## MBLM, seasonal rate of change ~ year
+
+```{r}
+library(mblm)
+
+```
+
+### TMin
+
+```{r `fit regressions TMin`}
+#TMin
+
+## --------------------------
+# create list to store regression results
+TMin_modSums <- list()
+
+for (station_id in unique(TMin_lmslopes$StationID)) {
+  model_data <- TMin_lmslopes %>%
+    filter(StationID == station_id)
+    
+
+      model <- mblm(model_slope ~ Year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      TMin_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
+        )
+  }
+
+```
+
+
+```{r `add reg stats to TMin summary df`}
+# create station-month key
+TMin_mblm <- data.frame(StationID = unique(TMin_lmslopes$StationID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intcpt = NA,
+          variable = "TMin")
+
+for (i in 1:nrow(TMin_mblm)) {
+  station = TMin_mblm$StationID[i]
+  
+  TMin_mblm$model_slope[i] <-  TMin_modSums[[station]]$slope
+   TMin_mblm$model_MAD[i] <-  TMin_modSums[[station]]$MAD
+    TMin_mblm$model_pval[i] <-  TMin_modSums[[station]]$pvalue
+     TMin_mblm$model_intcpt[i] <- TMin_modSums[[station]]$intercept
+  
+}
+
+#write_csv(TMin_mblm, "output_data/annualLongTerm/TMin_mblmAnnual_AprAug.csv")
+```
+
+
+### TMean
+
+```{r `fit regressions TMean`}
+#TMean
+
+## --------------------------
+# create list to store regression results
+TMean_modSums <- list()
+
+for (station_id in unique(TMean_lmslopes$StationID)) {
+  model_data <- TMean_lmslopes %>%
+    filter(StationID == station_id)
+    
+
+      model <- mblm(model_slope ~ Year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      TMean_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
+        )
+  }
+
+```
+
+```{r `add reg stats to TMean summary df`}
+# create station-month key
+TMean_mblm <- data.frame(StationID = unique(TMean_lmslopes$StationID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intcpt = NA,
+          variable = "TMean")
+
+for (i in 1:nrow(TMean_mblm)) {
+  station = TMean_mblm$StationID[i]
+  
+  TMean_mblm$model_slope[i] <-  TMean_modSums[[station]]$slope
+   TMean_mblm$model_MAD[i] <-  TMean_modSums[[station]]$MAD
+    TMean_mblm$model_pval[i] <-  TMean_modSums[[station]]$pvalue
+     TMean_mblm$model_intcpt[i] <- TMean_modSums[[station]]$intercept
+  
+}
+
+#write_csv(TMean_mblm, "output_data/annualLongTerm/TMean_mblmAnnual_AprAug.csv")
+```
+
+
+### TRange
+
+```{r `fit regressions TRange`}
+#TRange
+
+## --------------------------
+# create list to store regression results
+TRange_modSums <- list()
+
+for (station_id in unique(TRange_lmslopes$StationID)) {
+  model_data <- TRange_lmslopes %>%
+    filter(StationID == station_id)
+    
+
+      model <- mblm(model_slope ~ Year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      TRange_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
+        )
+  }
+
+```
+
+```{r `add reg stats to TRange summary df`}
+# create station-month key
+TRange_mblm <- data.frame(StationID = unique(TRange_lmslopes$StationID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intcpt = NA,
+          variable = "TRange")
+
+for (i in 1:nrow(TRange_mblm)) {
+  station = TRange_mblm$StationID[i]
+  
+  TRange_mblm$model_slope[i] <-  TRange_modSums[[station]]$slope
+   TRange_mblm$model_MAD[i] <-  TRange_modSums[[station]]$MAD
+    TRange_mblm$model_pval[i] <-  TRange_modSums[[station]]$pvalue
+     TRange_mblm$model_intcpt[i] <- TRange_modSums[[station]]$intercept
+  
+}
+
+#write_csv(TRange_mblm, "output_data/annualLongTerm/TRange_mblmAnnual_AprAug.csv")
+```
+
+
+### TMax
+
+```{r `fit regressions TMax`}
+#TMax
+
+## --------------------------
+# create list to store regression results
+TMax_modSums <- list()
+
+for (station_id in unique(TMax_lmslopes$StationID)) {
+  model_data <- TMax_lmslopes %>%
+    filter(StationID == station_id)
+    
+
+      model <- mblm(model_slope ~ Year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      TMax_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
+        )
+  }
+
+```
+
+```{r `add reg stats to TMax summary df`}
+# create station-month key
+TMax_mblm <- data.frame(StationID = unique(TMax_lmslopes$StationID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intcpt = NA,
+          variable = "TMax")
+
+for (i in 1:nrow(TMax_mblm)) {
+  station = TMax_mblm$StationID[i]
+  
+  TMax_mblm$model_slope[i] <-  TMax_modSums[[station]]$slope
+   TMax_mblm$model_MAD[i] <-  TMax_modSums[[station]]$MAD
+    TMax_mblm$model_pval[i] <-  TMax_modSums[[station]]$pvalue
+     TMax_mblm$model_intcpt[i] <- TMax_modSums[[station]]$intercept
+  
+}
+
+#write_csv(TMax_mblm, "output_data/annualLongTerm/TMax_mblmAnnual_AprAug.csv")
+```
+
+
+### DOMin
+
+```{r `fit regressions DOMin`}
+#DOMin
+
+## --------------------------
+# create list to store regression results
+DOMin_modSums <- list()
+
+for (station_id in unique(DOMin_lmslopes$StationID)) {
+  model_data <- DOMin_lmslopes %>%
+    filter(StationID == station_id)
+    
+
+      model <- mblm(model_slope ~ Year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      DOMin_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
+        )
+  }
+
+```
+
+```{r `add reg stats to DOMin summary df`}
+# create station-month key
+DOMin_mblm <- data.frame(StationID = unique(DOMin_lmslopes$StationID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intcpt = NA,
+          variable = "DOMin")
+
+for (i in 1:nrow(DOMin_mblm)) {
+  station = DOMin_mblm$StationID[i]
+  
+  DOMin_mblm$model_slope[i] <-  DOMin_modSums[[station]]$slope
+   DOMin_mblm$model_MAD[i] <-  DOMin_modSums[[station]]$MAD
+    DOMin_mblm$model_pval[i] <-  DOMin_modSums[[station]]$pvalue
+     DOMin_mblm$model_intcpt[i] <- DOMin_modSums[[station]]$intercept
+  
+}
+
+#write_csv(DOMin_mblm, "output_data/annualLongTerm/DOMin_mblmAnnual_AprAug.csv")
+```
+
+
+### DOMean
+
+```{r `fit regressions DOMean`}
+#DOMean
+
+## --------------------------
+# create list to store regression results
+DOMean_modSums <- list()
+
+for (station_id in unique(DOMean_lmslopes$StationID)) {
+  model_data <- DOMean_lmslopes %>%
+    filter(StationID == station_id)
+    
+
+      model <- mblm(model_slope ~ Year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      DOMean_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
+        )
+  }
+
+```
+
+```{r `add reg stats to DOMean summary df`}
+# create station-month key
+DOMean_mblm <- data.frame(StationID = unique(DOMean_lmslopes$StationID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intcpt = NA,
+          variable = "DOMean")
+
+for (i in 1:nrow(DOMean_mblm)) {
+  station = DOMean_mblm$StationID[i]
+  
+  DOMean_mblm$model_slope[i] <-  DOMean_modSums[[station]]$slope
+   DOMean_mblm$model_MAD[i] <-  DOMean_modSums[[station]]$MAD
+    DOMean_mblm$model_pval[i] <-  DOMean_modSums[[station]]$pvalue
+     DOMean_mblm$model_intcpt[i] <- DOMean_modSums[[station]]$intercept
+  
+}
+
+#write_csv(DOMean_mblm, "output_data/annualLongTerm/DOMean_mblmAnnual_AprAug.csv")
+```
+
+
+### DORange
+
+```{r `fit regressions DORange`}
+#DORange
+
+## --------------------------
+# create list to store regression results
+DORange_modSums <- list()
+
+for (station_id in unique(DORange_lmslopes$StationID)) {
+  model_data <- DORange_lmslopes %>%
+    filter(StationID == station_id)
+    
+
+      model <- mblm(model_slope ~ Year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      DORange_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
+        )
+  }
+
+```
+
+```{r `add reg stats to DORange summary df`}
+# create station-month key
+DORange_mblm <- data.frame(StationID = unique(DORange_lmslopes$StationID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intcpt = NA,
+          variable = "DORange")
+
+for (i in 1:nrow(DORange_mblm)) {
+  station = DORange_mblm$StationID[i]
+  
+  DORange_mblm$model_slope[i] <-  DORange_modSums[[station]]$slope
+   DORange_mblm$model_MAD[i] <-  DORange_modSums[[station]]$MAD
+    DORange_mblm$model_pval[i] <-  DORange_modSums[[station]]$pvalue
+     DORange_mblm$model_intcpt[i] <- DORange_modSums[[station]]$intercept
+  
+}
+
+#write_csv(DORange_mblm, "output_data/annualLongTerm/DORange_mblmAnnual_AprAug.csv")
+```
+
+
+### DOMax
+
+```{r `fit regressions DOMax`}
+#DOMax
+
+## --------------------------
+# create list to store regression results
+DOMax_modSums <- list()
+
+for (station_id in unique(DOMax_lmslopes$StationID)) {
+  model_data <- DOMax_lmslopes %>%
+    filter(StationID == station_id)
+    
+
+      model <- mblm(model_slope ~ Year, data = model_data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      DOMax_modSums[[station_id]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients["(Intercept)", 1]
+        )
+  }
+
+```
+
+```{r `add reg stats to DOMax summary df`}
+# create station-month key
+DOMax_mblm <- data.frame(StationID = unique(DOMax_lmslopes$StationID),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intcpt = NA,
+          variable = "DOMax")
+
+for (i in 1:nrow(DOMax_mblm)) {
+  station = DOMax_mblm$StationID[i]
+  
+  DOMax_mblm$model_slope[i] <-  DOMax_modSums[[station]]$slope
+   DOMax_mblm$model_MAD[i] <-  DOMax_modSums[[station]]$MAD
+    DOMax_mblm$model_pval[i] <-  DOMax_modSums[[station]]$pvalue
+     DOMax_mblm$model_intcpt[i] <- DOMax_modSums[[station]]$intercept
+  
+}
+
+#write_csv(DOMax_mblm, "output_data/annualLongTerm/DOMax_mblmAnnual_AprAug.csv")
+```
+
+### Combine to Single Dataframe
+
+```{r}
+## Combine all mblm model results into single df
+
+varlist <- ls()
+
+myvars <- varlist[which(grepl("_mblm$", varlist))]
+
+combined_data <- do.call(rbind, lapply(myvars, function(x) {
+  get(x)
+}))
+
+write_csv(combined_data, "output_data/annualLongTerm/mblm_AprAug_allVariables.csv")
+
+```
+
+
+# Data Viz: mblm slopes for all stations, by variable
+
+```{r}
+# geom_line has no 'mblm' formula option; abline is the work around.
+# but abline has no axis values associated, it is just an infinite line based on slope and intercept.
+# effectively plotting the mblm lines thus requires a geom_ layer to define the scales. 
+
+# also, field to color lines by slope significance must be added
+mblm_data <- combined_data %>%
+  mutate(significant = if_else(model_pval <= .05 & model_slope > 0, "significant positive", 
+                               if_else(model_pval <= .05 & model_slope < 0, "significant negative", "not significant"))
+         ) %>%
+  mutate(var_class = ifelse(startsWith(variable, "T"), "Temperature", "Dissolved Oxygen")) %>%
+  mutate(var_type = case_when(
+    endsWith(variable, "Max") ~ "Max",
+    endsWith(variable, "Min") ~ "Min",
+    endsWith(variable, "Range") ~ "Range",
+    endsWith(variable, "Mean") ~ "Mean",
+    TRUE ~ ""
+  ))
+
+# set significant as factor to ensure sig lines sit on top of insignificant lines
+mblm_data$significant <- factor(mblm_data$significant, levels = c("significant positive", "significant negative", "not significant"))
+
+# point plotting variable -- new var name so that it can be modified to remove outliers as needed without affecting the original data frame
+annualTrends.df <- slopes.df
+
+## The following was iterative, based on plotting and replotting using facet_grid and visually asessing the plots. For some reason scale = "free" did not actually allow for free scales, such that each row (and col?)
+# Remove outlier from TMAx to tighten the y axis range.
+#xoutlier <- annualTrends.df %>%
+ # filter(variable == "TMax") %>%
+ # summarize(min = min(model_slope))
+
+#outlier_index <- which(annualTrends.df$model_slope == xoutlier$min & annualTrends.df$variable == "TMax")
+
+#annualTrends.df$model_slope[outlier_index] <- NA
+
+# Remove max and min from TRange
+#xoutlier <- annualTrends.df %>%
+ # filter(variable == "TRange") %>%
+ # summarize(min = min(model_slope),
+          #  max = max(model_slope))
+
+#outlier_indices <- which((annualTrends.df$model_slope == xoutlier$min | annualTrends.df$model_slope == xoutlier$max) & annualTrends.df$variable == "TRange")
+
+#annualTrends.df$model_slope[outlier_indices] <- NA
+
+```
+
+
+```{r fig.width=7, fig.height=7}
+
+plot <- ggplot() +
+  geom_point(data = annualTrends.df, aes(x = Year, y = model_slope), alpha = 0) +
+  geom_abline(data = mblm_data, aes(intercept = model_intcpt, slope = model_slope, color = significant), 
+              linewidth = .42, alpha = .6) +
+   labs(title = NULL,
+       x = "Year",
+       y = NULL) +  
+  facet_grid(var_class ~ var_type, scales = "free",
+             labeller = labeller(var_class = as_labeller(c("Dissolved Oxygen" = "Dissolved Oxygen (mg 02/L/day)", "Temperature" = "Temperature (C/day)")))) +
+  scale_color_manual(values = c("not significant" = "grey72", 
+                                "significant positive" = "#C9A818", 
+                                "significant negative" = "#124E78")) +
+  theme_minimal() + 
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),
+        axis.title = element_text(size = 14), 
+        axis.text = element_text(size = 9.5), 
+        axis.text.x = element_text(angle = 45, hjust = .8),
+        legend.text = element_text(size = 8),  
+        legend.title = element_blank(),
+        strip.text = element_text(size = 11),
+        panel.grid = element_line(color = "grey90", linewidth = .1),
+        aspect.ratio = 1.8)
+
+plot(plot)
+ggsave("annualLongterm_plot_AprAug.jpg", plot)
+```
+
+
+
+
+```{r}
+results <- data.frame(station = unique(TMin_lmslopes$StationID),
+                      slopeTies = NA,
+                      yearTies = NA)
+
+for (station in unique(TMin_lmslopes$StationID)) {
+  slopes = TMin_lmslopes %>%
+    filter(StationID == station)
+  
+  ties = c()
+  
+  for (i in 1:nrow(slopes)) {
+    slopes_vec <- slopes$model_slope[-i]
+    current_slope <- slopes$model_slope[i]
+    ties[i] <- current_slope %in% slopes_vec
+  }
+  
+  results[results$station == station, "slopeTies"] <- ifelse(any(ties), "YES", "NO")
+  
+    ties2 = c()
+  
+  for (i in 1:nrow(slopes)) {
+    years_vec <- slopes$Year[-i]
+    current_year <- slopes$Year[i]
+    ties2[i] <- current_year %in% years_vec
+  }
+  
+  results[results$station == station, "yearTies"] <- ifelse(any(ties2), "YES", "NO")
+}
+
+```
+

@@ -1043,10 +1043,12 @@ plot <- ggplot() +
         legend.text = element_text(size = 8),  
         legend.title = element_blank(),
         strip.text = element_text(size = 11),
-        panel.grid = element_line(color = "grey90", linewidth = .1))
+        panel.grid = element_line(color = "grey90", linewidth = .1),
+        aspect.ratio = 1.8)
 
 plot(plot)
-ggsave("annualLongterm_plot.jpg", plot)
+ggsave("annualLongterm_plot2.jpg", plot)
+```
 
 # Custom labels after creating plot using `grid` package
 ## Create grob object
@@ -1065,4 +1067,3 @@ grid.text(lab_temp, x = 0, y = y_temp, rot = 90, gp=gpar(fontsize=20, col="grey"
 # Draw the modified plot
 x <- grid::grid.draw(pgrob, recording = TRUE)
 
-```
