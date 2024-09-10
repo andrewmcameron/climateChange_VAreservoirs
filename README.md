@@ -5,35 +5,18 @@
 </p>
 
 
-A project focused on the application of Median-Based Linear Models (MBLM), using `mblm` package in R, to understand water surface temperature warming rates over time in reservoirs across the state of Virginia. Work completed in collaboration with [Dr. Paul Bukaveckas](https://blogs.vcu.edu/pabukaveckas/) of VCU's Center for Environmental Sudies.
+A project focused on the application of Median-Based Linear Models (MBLM), using `mblm` package in R, to assess trends in water temperature and dissolved oxygen levels over time in reservoirs across the state of Virginia. The work was completed in collaboration with [Dr. Paul Bukaveckas](https://blogs.vcu.edu/pabukaveckas/) of VCU's Center for Environmental Sudies.
 
 # Summary
 
-The analysis uses long-term monitoring data from the Virginia Department of Environmental Quality to examine trends across 41 monitoring stations in reservoirs throughout the state of Virginia during the months of May-October. Median-based linear modelling was used because it is believed to be more robust to the presence of outlier data points than ordinary least squares linear regression.
-Lake stations were selected that had at least 100 depth profiles recorded over the last 40+ years, with the earliest observations in the dataset coming from 1968.
+The study focused on reservoirs in Virginia. Monitoring data were provided by the Virginia Department of Environmental Quality (DEQ). 
 
-After subsetting data for the 41 selected lake stations from the larger DEQ dataset, mean, minimum, maximum, and the number of observations for maximum temperature (`TMax`) are derived for each station-month (41 sites x 6 months = 246 station-months), aggregating across all available years.
+The dataset contained approximately 182,000 individual measurements of temperature and DO from over 500 lake stations, from the 1970s to the 2023. For this analysis, 41 stations were selected based on the availability of at least 100 profile dates between May and October. These stations included shallow sites (less than 3 meters in depth) and deep sites, and provided a total of 6,184 profiles. The data span approximately 40 years, with some stations monitored as early as the 1970s.
 
-A "temperature anomaly" field (`TAnomaly`) is derived by subtracting the long-term monthly average maximum temperature from each observed `TMax` value. To analyze trends over time, a MBLM for each station-month is fitted using the formula `TAnomaly ~ Year`. In the file `TempDO_climateChange_analysis.Rmd`, model slope (i.e., change in temperature (degrees C) per year) is used to create a series of data visualizations in an effort to identify potential causes of variability in lake warming rates.
+Trend Analysis
 
-## Files
+Station-specific trends were derived on a monthly basis (May-October) for temperature and DO, considering surface, bottom, mean, and range values. Temperature values were converted to anomalies by subtracting the long-term monthly average from observed values. Trends were then analyzed using the `mblm` package to derive Thiel-Sen slopes. MBLM being less sensitive to outliers than ordinary least squares. This approach allowed for the identification of long-term trends in temperature and DO.
 
-This repository includes the following files and directories:
+Additionally, monthly average air temperature data from 1970 to 2021 were retrieved from NOAA’s National Centers for Environmental Information. These data was analyzed for four climate regions within Virginia that encompass most of the reservoirs in the analysis. Air temperature trends were derived using the same methods as for the water temperature data, allowing for the examination of correlations between atmospheric and reservoir trends.
 
-| File Name                          | Description                                       |
-|------------------------------------|---------------------------------------------------|
-| ecoregions_shp/                     | folder containg shapefile of Virginia Level III ecoregions (source: EPA)|
-| TempDO_climateChange_analysis.Rmd  | R Markdown file for data preparation in climate change analysis, includes fix for TAnomaly calculation.|
-| TempDO_climateChange_viz.Rmd  | R Markdown file for data analysis and viz|
-| VADEQ_stationInfo.csv              | VA DEQ station information |
-| data_original.xlsx                 | source data|
-| reservoir-temp-DO.Rproj            | R Project file |
-| .gitignore                        |  .gitignore                                                                   |
 
-## Requirements
-
-The following libraries are required:
-* `tidyverse`
-* `mblm`
-* `ggplot2`
-* `sf` (to associate reservoirs with level 3 ecoregions)
