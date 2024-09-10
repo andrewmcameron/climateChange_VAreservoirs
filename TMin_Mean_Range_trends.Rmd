@@ -1,6 +1,6 @@
 ---
 title: "Assessing Climate Change Effects in VA Reservoirs"
-subtitle: "Part 2: Deriving Trends for Temperature Min, Mean and Range"
+subtitle: "Part 2: Deriving Temperature Trends by Month and Station (TMin, TMean, TRange)"
 author: "Andrew Cameron"
 output: html_document
 ---
@@ -140,10 +140,12 @@ library(mblm)
 
 # remove NA values -- mblm() does not handle NA as lm() does
 df.Tmin <- df.Tmin %>%
-  filter(!is.na(TAnomaly))
+  filter(!is.na(TAnomaly)) %>%
+  filter(!is.na(TMin))
 
+## ------TMin Anomaly------
 # create list to store regression results
-modelSummaries <- list()
+modelSummaries_TMinAnomaly <- list()
 
 for (station_id in unique(df.Tmin$FDT_STA_ID)) {
   for (month_num in 5:10) {
@@ -155,13 +157,61 @@ for (station_id in unique(df.Tmin$FDT_STA_ID)) {
       mod.sum <- summary.mblm(model)
       
       # store results
-      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+      modelSummaries_TMinAnomaly[[paste(station_id, month_num, sep = "_")]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
         )
   }
 }
+
+## --------TMin, non-normalized--------
+# 6/4 Do the same as above, but for TMin non-normalized. This is needed for the data viz (August only trend line plots)
+
+modelSummaries_TMin <- list()
+
+for (station_id in unique(df.Tmin$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- df.Tmin %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(TMin ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_TMin[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+}
+
+## --------TMin, with 1975 as y intercept-------------
+#  please send a csv file of the Tmin (bottom) results shown in this figure [using TMin and not TMinAnomaly], which includes the y intercept of the trend line (at year = 1975), along with the slope and p value.  I'd like to see whether the lakes with colder bottoms are warming at the same rate as the lakes with warmer bottoms.
+q <- df.Tmin %>%
+  mutate(Year1975 = Year - 1975) %>%
+  filter(MonthNum == 8)
+
+modelSummaries_TMin1975 <- list()
+
+for (station_id in unique(q$FDT_STA_ID)) {
+      data = subset(q, FDT_STA_ID == station_id)
+      model <- mblm(TMin ~ Year1975, data = data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_TMin1975[[paste(station_id)]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year1975", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year1975", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
 
 # mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
 
@@ -170,26 +220,65 @@ for (station_id in unique(df.Tmin$FDT_STA_ID)) {
 
 ```{r `add reg stats to summary df`}
 # create station-month key
-monthly_Tmin <- monthly_Tmin %>%
+monthly_TMinAnomaly <- monthly_Tmin %>%
   mutate(key = paste(FDT_STA_ID, MonthNum, sep="_"),
           model_slope = NA,
           model_MAD = NA,
-          model_pval = NA)
+          model_pval = NA,
+          model_intercept = NA)
 
-for (i in 1:nrow(monthly_Tmin)) {
-  key = monthly_Tmin$key[i]
+for (i in 1:nrow(monthly_TMinAnomaly)) {
+  key = monthly_TMinAnomaly$key[i]
   
-  monthly_Tmin$model_slope[i] <-  modelSummaries[[key]]$slope
-   monthly_Tmin$model_MAD[i] <-  modelSummaries[[key]]$MAD
-    monthly_Tmin$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  monthly_TMinAnomaly$model_slope[i] <-  modelSummaries_TMinAnomaly[[key]]$slope
+   monthly_TMinAnomaly$model_MAD[i] <-  modelSummaries_TMinAnomaly[[key]]$MAD
+    monthly_TMinAnomaly$model_pval[i] <-  modelSummaries_TMinAnomaly[[key]]$pvalue
+     monthly_TMinAnomaly$model_intercept[i] <-  modelSummaries_TMinAnomaly[[key]]$intercept
   
 }
 
+#---------------------------------------------
+# Same as above, but for TMin non-normalized
 
-monthly_Tmin %>%
-  select(-key) -> Tmin_final
+monthly_TMin <- monthly_Tmin %>%
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA)
 
-write_csv(Tmin_final, "output_data/TMin_mblmModelStatistics.csv")
+for (i in 1:nrow(monthly_TMin)) {
+  key = monthly_TMin$key[i]
+  
+  monthly_TMin$model_slope[i] <-  modelSummaries_TMin[[key]]$slope
+   monthly_TMin$model_MAD[i] <-  modelSummaries_TMin[[key]]$MAD
+    monthly_TMin$model_pval[i] <-  modelSummaries_TMin[[key]]$pvalue
+     monthly_TMin$model_intercept[i] <-  modelSummaries_TMin[[key]]$intercept
+  
+}
+
+#--------------------------------------------
+# reg stats for August TMin non-normalized with 1975 as y intercept
+monthly_TMin1975 <- monthly_Tmin %>%
+  mutate( model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA) %>%
+  filter(MonthNum == 8)
+
+for (i in 1:nrow(monthly_TMin1975)) {
+  key = monthly_TMin1975$FDT_STA_ID[i]
+  
+  monthly_TMin1975$model_slope[i] <-  modelSummaries_TMin1975[[key]]$slope
+   monthly_TMin1975$model_MAD[i] <-  modelSummaries_TMin1975[[key]]$MAD
+    monthly_TMin1975$model_pval[i] <-  modelSummaries_TMin1975[[key]]$pvalue
+     monthly_TMin1975$model_intercept[i] <-  modelSummaries_TMin1975[[key]]$intercept
+  
+}
+
+#write_csv(monthly_TMinAnomaly, "output_data/TMinAnomaly_mblmModelStatistics.csv")
+write_csv(monthly_TMin, "output_data/TMin_mblmModelStatistics.csv")
+write_csv(monthly_TMin1975, "output_data/TMin_y1975.csv")
 ```
 
 
@@ -236,10 +325,11 @@ library(mblm)
 
 # remove NA values -- mblm() does not handle NA as lm() does
 df.TMean <- df.TMean %>%
-  filter(!is.na(TAnomaly))
+  filter(!is.na(TAnomaly)) %>%
+  filter(!is.na(TMean))
 
 # create list to store regression results
-modelSummaries <- list()
+modelSummaries_TMeanAnomaly <- list()
 
 for (station_id in unique(df.TMean$FDT_STA_ID)) {
   for (month_num in 5:10) {
@@ -251,13 +341,60 @@ for (station_id in unique(df.TMean$FDT_STA_ID)) {
       mod.sum <- summary.mblm(model)
       
       # store results
-      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+      modelSummaries_TMeanAnomaly[[paste(station_id, month_num, sep = "_")]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
         )
   }
 }
+
+# 6/4 Do the same as above, but for TMean non-normalized. This is needed for the data viz (August only trend line plots)
+
+modelSummaries_TMean <- list()
+
+for (station_id in unique(df.Tmin$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- df.Tmin %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(TMean ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_TMean[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+}
+
+## --------TMean, with 1975 as y intercept-------------
+
+q <- df.TMean %>%
+  mutate(Year1975 = Year - 1975) %>%
+  filter(MonthNum == 8)
+
+modelSummaries_TMean1975 <- list()
+
+for (station_id in unique(q$FDT_STA_ID)) {
+      data = subset(q, FDT_STA_ID == station_id)
+      model <- mblm(TMean ~ Year1975, data = data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_TMean1975[[paste(station_id)]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year1975", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year1975", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
 
 # mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
 
@@ -266,26 +403,65 @@ for (station_id in unique(df.TMean$FDT_STA_ID)) {
 
 ```{r `add reg stats to summary df2`}
 # create station-month key
-monthly_TMean <- monthly_TMean %>%
+monthly_TMeanAnomaly <- monthly_TMean %>%
   mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
           model_slope = NA,
           model_MAD = NA,
-          model_pval = NA)
+          model_pval = NA,
+          model_intercept = NA)
+
+for (i in 1:nrow(monthly_TMeanAnomaly)) {
+  key = monthly_TMeanAnomaly$key[i]
+  
+  monthly_TMeanAnomaly$model_slope[i] <-  modelSummaries_TMeanAnomaly[[key]]$slope
+   monthly_TMeanAnomaly$model_MAD[i] <-  modelSummaries_TMeanAnomaly[[key]]$MAD
+    monthly_TMeanAnomaly$model_pval[i] <-  modelSummaries_TMeanAnomaly[[key]]$pvalue
+     monthly_TMeanAnomaly$model_intercept[i] <-  modelSummaries_TMeanAnomaly[[key]]$intercept
+  
+}
+
+# Same as above, but for TMean non-normalized
+monthly_TMean <- monthly_TMean %>%
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA)
 
 for (i in 1:nrow(monthly_TMean)) {
   key = monthly_TMean$key[i]
   
-  monthly_TMean$model_slope[i] <-  modelSummaries[[key]]$slope
-   monthly_TMean$model_MAD[i] <-  modelSummaries[[key]]$MAD
-    monthly_TMean$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  monthly_TMean$model_slope[i] <-  modelSummaries_TMean[[key]]$slope
+   monthly_TMean$model_MAD[i] <-  modelSummaries_TMean[[key]]$MAD
+    monthly_TMean$model_pval[i] <-  modelSummaries_TMean[[key]]$pvalue
+     monthly_TMean$model_intercept[i] <-  modelSummaries_TMean[[key]]$intercept
   
 }
 
 
-monthly_TMean %>%
-  select(-key) -> TMean_final
+#--------------------------------------------
+# reg stats for August TMean non-normalized with 1975 as y intercept
+monthly_TMean1975 <- monthly_TMean %>%
+  mutate( model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA) %>%
+  filter(MonthNum == 8)
 
-write_csv(TMean_final, "output_data/TMean_mblmModelStatistics.csv")
+for (i in 1:nrow(monthly_TMean1975)) {
+  key = monthly_TMean1975$FDT_STA_ID[i]
+  
+  monthly_TMean1975$model_slope[i] <-  modelSummaries_TMean1975[[key]]$slope
+   monthly_TMean1975$model_MAD[i] <-  modelSummaries_TMean1975[[key]]$MAD
+    monthly_TMean1975$model_pval[i] <-  modelSummaries_TMean1975[[key]]$pvalue
+     monthly_TMean1975$model_intercept[i] <-  modelSummaries_TMean1975[[key]]$intercept
+  
+}
+
+
+
+write_csv(monthly_TMeanAnomaly, "output_data/TMeanAnomaly_mblmModelStatistics.csv")
+#write_csv(monthly_TMean1975, "output_data/TMean_y1975.csv")
 ```
 
 
@@ -347,10 +523,34 @@ for (station_id in unique(df.TRange$FDT_STA_ID)) {
       modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
         )
   }
 }
+
+## --------TRange, with 1975 as y intercept-------------
+
+q <- df.TRange %>%
+  mutate(Year1975 = Year - 1975) %>%
+  filter(MonthNum == 8)
+
+modelSummaries_TRange1975 <- list()
+
+for (station_id in unique(q$FDT_STA_ID)) {
+      data = subset(q, FDT_STA_ID == station_id)
+      model <- mblm(TRange ~ Year1975, data = data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_TRange1975[[paste(station_id)]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year1975", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year1975", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
 
 # mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
 
@@ -363,7 +563,8 @@ monthly_TRange <- monthly_TRange %>%
   mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
           model_slope = NA,
           model_MAD = NA,
-          model_pval = NA)
+          model_pval = NA,
+          model_intercept = NA)
 
 for (i in 1:nrow(monthly_TRange)) {
   key = monthly_TRange$key[i]
@@ -371,16 +572,53 @@ for (i in 1:nrow(monthly_TRange)) {
   monthly_TRange$model_slope[i] <-  modelSummaries[[key]]$slope
    monthly_TRange$model_MAD[i] <-  modelSummaries[[key]]$MAD
     monthly_TRange$model_pval[i] <-  modelSummaries[[key]]$pvalue
+     monthly_TRange$model_intercept[i] <-  modelSummaries[[key]]$intercept
   
 }
 
 
-monthly_TRange %>%
-  select(-key) -> TRange_final
+#--------------------------------------------
+# reg stats for August TRange with 1975 as y intercept
+monthly_TRange1975 <- monthly_TRange %>%
+  mutate( model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA) %>%
+  filter(MonthNum == 8)
 
-write_csv(TRange_final, "output_data/TRange_mblmModelStatistics.csv")
+for (i in 1:nrow(monthly_TRange1975)) {
+  key = monthly_TRange1975$FDT_STA_ID[i]
+  
+  monthly_TRange1975$model_slope[i] <-  modelSummaries_TRange1975[[key]]$slope
+   monthly_TRange1975$model_MAD[i] <-  modelSummaries_TRange1975[[key]]$MAD
+    monthly_TRange1975$model_pval[i] <-  modelSummaries_TRange1975[[key]]$pvalue
+     monthly_TRange1975$model_intercept[i] <-  modelSummaries_TRange1975[[key]]$intercept
+  
+}
+
+
+
+write_csv(monthly_TRange, "output_data/TRange_mblmModelStatistics.csv")
 ```
 
+### Single DF with all 1975 y-intercept model results
+
+```{r}
+a <- monthly_TMean1975 %>%
+  mutate(variable = "TMean")
+b <- monthly_TMin1975 %>%
+  mutate(variable = "TMin")
+c <- monthly_TRange1975 %>%
+  mutate(variable = "TRange")
+
+d <- rbind(a,b,c) %>%
+  select(-Mean, -Min, - Max)
+
+readr::write_csv(d, "output_data/1975_y_intercept_TempVars_model_results.csv")
+
+
+
+```
 
 
 ## Data viz

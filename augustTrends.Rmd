@@ -1,0 +1,202 @@
+---
+title: "Assessing Climate Change Effects in VA Reservoirs"
+subtitle: "Part 5: August-specific Trends by Station and Variable"
+date: "2024-06-04"
+output: html_document
+---
+
+```{r}
+## Load Libraries
+packs <- c("tidyverse", "ggplot2", "lubridate", "mblm", "openxlsx", "ggh4x")
+for (pack in packs) {
+  if (!require(pack, character.only = TRUE)) {
+    install.packages(pack, dependencies = TRUE)
+  }
+}
+
+```
+
+# Function to load and prepare mblm model statistics data
+
+This function reads in each of the mblmModelStatistics csv files for the the eight variables, binds them together, and adds a variable identifier field to indicate the variable that model corresponds to.
+
+```{r}
+load_mblm_data <- function(data_dir) {
+  mblmList <- list()
+  file_paths <- list.files(file.path(getwd(), "/output_data"), pattern = "mblmModelStatistics", full.names = TRUE)
+  
+  for (file in file_paths) {
+    mblmList[[file]] <- read.csv(file)
+  }
+  
+  for (i in seq_along(mblmList)) {
+    mblmList[[i]]$variable <- gsub("_mblmModelStatistics.csv", "", basename(file_paths[i]))
+  }
+  
+  mblm_allVars <- bind_rows(mblmList)
+  return(mblm_allVars)
+}
+
+# Load mblm model statistics data and filter for August
+mblm_allVars <- load_mblm_data("/output_data")
+mblm_August <- mblm_allVars %>% 
+  filter(Month == "August")
+
+```
+
+
+# Load data from Excel file
+
+`trendsites.df` contains the list of stations for which we have data.
+
+`rawData.df` contains ~19,00 profiles from over 500 stations. 
+
+```{r}
+trendSites.df <- openxlsx::read.xlsx("input_data/data_original.xlsx", sheet = 2)
+rawData.df <- openxlsx::read.xlsx("input_data/data_original.xlsx", sheet = 3)
+
+# Convert Excel numeric date to POSIXct
+rawData.df$Date <- as.POSIXct((rawData.df$Date - 25569) * 86400, origin = "1970-01-01", tz = "UTC")
+
+# Filter for relevant stations and August-only data
+station_IDS <- trendSites.df$FDT_STA_ID
+raw_filtered <- rawData.df %>%
+  mutate(MonthNum = month(Date)) %>%
+  filter(FDT_STA_ID %in% station_IDS & MonthNum == 8) %>%
+  mutate(Year = year(Date))
+
+# Select relevant variables
+raw_filtered <- raw_filtered %>%
+  select(FDT_STA_ID, Date, TMax, TMin, TMean, TRange, DOMin, DOMax, DOMean, DORange, MaxYear, MinYear)
+
+```
+
+
+# Transform data to long format for analysis
+
+```{r}
+df.long <- raw_filtered %>%
+  pivot_longer(cols = c(TMax, TMin, TMean, TRange, DOMin, DOMax, DOMean, DORange),
+               names_to = "variable",
+               values_to = "value") %>%
+  mutate(key = paste0(FDT_STA_ID, "_", variable))
+
+mblm_August <- mblm_August %>%
+  mutate(key = paste0(FDT_STA_ID, "_", variable)) %>%
+  select(-variable)
+
+# Join datasets & add Year field
+plotting.df <- df.long %>%
+  left_join(mblm_August, by = "key") %>%
+  filter(!is.na(model_slope)) %>%
+  mutate(Year = lubridate::year(Date))
+
+```
+
+
+
+The following code chunk addresses an anomaly in the data for site 2-XDD000.40. During the early monitoring period (2003-2005), multiple data points were collected within the same month, unlike the usual single visit per month. This unequal distribution of data points disproportionately influences the trend line, giving more weight to the early measurements. To correct this, the trend estimate for August is recalculated using a single representative value for each year, achieved by averaging the multiple data points within each month. 
+
+```{r}
+# Re-run mblm for 2-XDD000.40
+# Create a new df with only the relevant data for 2-XDD000.40
+outlier.df <- plotting.df %>%
+  filter(FDT_STA_ID.x == "2-XDD000.40") %>% 
+  filter(variable == "TMax") %>%
+  select(FDT_STA_ID.x, Date, Year, value) %>%
+  group_by(Year) %>%
+  summarize(value = mean(value)) %>%
+  filter(!is.na(value))
+
+      model <- mblm::mblm(value ~ Year, data = outlier.df)
+      mod.sum <- mblm::summary.mblm(model)
+
+# Update plotting.df with new model results      
+plotting.df$model_slope[
+  plotting.df$FDT_STA_ID.x == "2-XDD000.40" & plotting.df$variable == "TMax"
+  ] <- mod.sum$coefficients[2,1]
+  
+plotting.df$model_pval[
+  plotting.df$FDT_STA_ID.x == "2-XDD000.40" & plotting.df$variable == "TMax"
+  ]  <- mod.sum$coefficients["Year", 4]
+        
+plotting.df$model_intercept[
+  plotting.df$FDT_STA_ID.x == "2-XDD000.40" & plotting.df$variable == "TMax"
+  ]  <- mod.sum$coefficients[1,1]
+
+```
+
+
+# Data Viz
+
+mblm slopes for all stations, by variable
+
+```{r}
+# Transform the data to include statistical significance. 
+plotting.df <- plotting.df %>%
+  mutate(significant = if_else(model_pval <= .05 & model_slope > 0, "significant positive", 
+                               if_else(model_pval <= .05 & model_slope < 0, "significant negative", "not significant"))
+         ) %>%
+  # Reformat var_class values for use in facet labelling/publication image
+  mutate(var_class = ifelse(grepl("TMax|TRange|TMin|TMean", variable), "Temperature (\u00B0C)", "Dissolved Oxygen (mg O\u2082 L\u207B\u00B9)")) %>%
+  mutate(var_class = factor(var_class, levels = c("Temperature (\u00B0C)", "Dissolved Oxygen (mg O\u2082 L\u207B\u00B9)"))) %>%
+  mutate(var_type = case_when(
+    endsWith(variable, "Max") ~ "Surface",
+    endsWith(variable, "Min") ~ "Bottom",
+    endsWith(variable, "Range") ~ "Range",
+    endsWith(variable, "Mean") ~ "Mean",
+    TRUE ~ "")) %>%
+  mutate(var_type = factor(var_type, levels = c("Surface", "Mean", "Bottom", "Range")))
+
+
+# set `significant` as factor to ensure sig lines sit on top of insignificant lines
+plotting.df$significant <- factor(plotting.df$significant, levels = c("significant positive", "significant negative", "not significant"))
+# set `variable` as factor to ensure proper order when plotting
+plotting.df$variable <- factor(plotting.df$variable, levels = c("TMax", "TMean", "TMin", "TRange", "DOMax", "DOMean", "DOMin", "DORange"))
+
+```
+
+
+```{r fig.width=7, fig.height=7, wraning=FALSE}
+
+plot <- ggplot(data = plotting.df) +
+  geom_segment(aes(x = MinYear, 
+                  xend = MaxYear,
+                  y = pmax(0, model_intercept + model_slope * MinYear), 
+                  yend = pmax(0, model_intercept + model_slope * MaxYear),
+                  color = significant),
+              linewidth = .27, alpha = .6) +
+   labs(title = NULL,
+       x = "Year",
+       y = NULL) +  
+  facet_grid(var_class ~ var_type, scales = "free", switch = "y") +
+  ggh4x::facetted_pos_scales(y = list(
+    var_class == "Temperature (\u00B0C)" ~ scale_y_continuous(limits = c(0,40)),
+    var_class == "Dissolved Oxygen (mg O\u2082 L\u207B\u00B9)" ~ scale_y_continuous(limits = c(0,20))
+  )) +
+  scale_color_manual(values = c("not significant" = "grey72", 
+                                "significant positive" = "#C9A818", 
+                                "significant negative" = "#124E78")) +
+  theme_minimal() + 
+  theme(legend.position = "top",
+        legend.key.height = unit(.5, "cm"),
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),
+        axis.title = element_text(size = 14), 
+        axis.text.y = element_text(size = 9.5,  margin = margin(t = 0, r = 3, b = 0, l = 0)), 
+        axis.text.x = element_text(size = 9.5, angle = 45, hjust = .95),
+        legend.text = element_text(size = 8),  
+        legend.title = element_blank(),
+        strip.text = element_text(size = 11),
+        strip.placement = "outside",
+        panel.grid = element_line(color = "grey90", linewidth = .1),
+        aspect.ratio = 1.8) +
+guides(color = guide_legend(override.aes = list(linewidth = 1.25, alpha = .9)))
+
+
+plot(plot)
+
+#ggsave("img/publication_images/augustTrends.jpg", device = "jpg", plot, dpi = 1000, width = 7, height = 7, units = "in")
+
+
+```

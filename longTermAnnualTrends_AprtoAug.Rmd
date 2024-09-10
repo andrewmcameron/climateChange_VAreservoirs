@@ -1,17 +1,36 @@
 ---
-title: "Long-Term Annual Trends in T & DO (Apr to Aug)"
-output: html_document
+title: "Assessing Climate Change Effects in VA Reservoirs"
+subtitle: "Part 4: Long-Term Annual Trends in T & DO (Apr to Aug)"
+output:  
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=TRUE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+# Install any missing packages
+install_packages <- function(packages) {
+  new_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+  if(length(new_packages) > 0) {
+    install.packages(new_packages, dependencies = TRUE)
+  }
+}
+
+packages <- c("ggplot2", "tidyverse", "mblm")
+install_packages(packages)
+
+library(ggplot2)
 library(tidyverse)
+library(mblm)
+
 ```
 
-    
+# Read in Data    
 ```{r `read in data`}
-trendSites.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
-allData.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3)
+trendSites.df <- openxlsx::read.xlsx("input_data/data_original.xlsx", sheet = 2)
+allData.df <- openxlsx::read.xlsx("input_data/data_original.xlsx", sheet = 3)
 
 # Convert `date` column from Excel encoded date to a more legible date format. Otherwise date shows as numeric value, e.g. '44230'.
     allData.df$Date <- allData.df$Date * 86400      # 86400 = seconds in a day.
@@ -29,7 +48,7 @@ allData.df[13770, (5:8)] <- NA
 ```
 # Data Filtering and Subsetting
 
-```{r `subset data for APR-AUG`}
+```{r `subset data for APR-AUG`, message = FALSE}
 # filter for rows corresponding to the 41 stations
 station_IDS <- trendSites.df$FDT_STA_ID
 
@@ -82,7 +101,7 @@ slopesList <- list()
 
 #### Temp
 
-```{r}
+```{r, message = FALSE}
 # TMin
 ## --------------------------------------------
 # Derive valid Nobs for each station-year
@@ -148,7 +167,7 @@ slopesList[["TMin"]] <- TMin_lmslopes
 
 ```
 
-```{r}
+```{r, message = FALSE}
 # TMean
 ## --------------------------------------------
 # Derive valid Nobs for each station-year
@@ -215,7 +234,7 @@ slopesList[["TMean"]] <- TMean_lmslopes
 ```
 
 
-```{r}
+```{r,message = FALSE}
 # TRange
 ## --------------------------------------------
 # Derive valid Nobs for each station-year
@@ -283,7 +302,7 @@ slopesList[["TRange"]] <- TRange_lmslopes
 
 #### Dissolved Oxygen
 
-```{r}
+```{r, message = FALSE}
 # DOMin
 ## --------------------------------------------
 # Derive valid Nobs for each station-year
@@ -349,7 +368,7 @@ slopesList[["DOMin"]] <- DOMin_lmslopes
 
 ```
 
-```{r}
+```{r,  message = FALSE}
 # DOMean
 ## --------------------------------------------
 # Derive valid Nobs for each station-year
@@ -415,7 +434,7 @@ slopesList[["DOMean"]] <- DOMean_lmslopes
 
 ```
 
-```{r}
+```{r, message = FALSE}
 # DORange
 ## --------------------------------------------
 # Derive valid Nobs for each station-year
@@ -485,7 +504,7 @@ slopesList[["DORange"]] <- DORange_lmslopes
 
 Include surface only stations
 
-```{r}
+```{r, message = FALSE}
 # TMax
 ## --------------------------------------------
 # Derive valid Nobs for each station-year
@@ -550,7 +569,7 @@ slopesList[["TMax"]] <- TMax_lmslopes
 
 ```
 
-```{r}
+```{r, message= FALSE}
 # DOMax
 ## --------------------------------------------
 # Derive valid Nobs for each station-year
@@ -633,19 +652,15 @@ slopes.df <- slopes.df %>%
 wider_df <- slopes.df %>%
   pivot_wider(names_from = variable, values_from = model_slope)
 
-write_csv(wider_df, "output_data/annualLongTerm/yearStation_slopeSummary_AprAug.csv")
+# write_csv(wider_df, "output_data/annualLongTerm/yearStation_slopeSummary_AprAug.csv")
 ```
 
 ## MBLM, seasonal rate of change ~ year
 
-```{r}
-library(mblm)
-
-```
 
 ### TMin
 
-```{r `fit regressions TMin`}
+```{r `fit regressions TMin`, warning = FALSE}
 #TMin
 
 ## --------------------------
@@ -691,13 +706,13 @@ for (i in 1:nrow(TMin_mblm)) {
   
 }
 
-#write_csv(TMin_mblm, "output_data/annualLongTerm/TMin_mblmAnnual_AprAug.csv")
+# write_csv(TMin_mblm, "output_data/annualLongTerm/TMin_mblmAnnual_AprAug.csv")
 ```
 
 
 ### TMean
 
-```{r `fit regressions TMean`}
+```{r `fit regressions TMean`, warning = FALSE}
 #TMean
 
 ## --------------------------
@@ -742,13 +757,13 @@ for (i in 1:nrow(TMean_mblm)) {
   
 }
 
-#write_csv(TMean_mblm, "output_data/annualLongTerm/TMean_mblmAnnual_AprAug.csv")
+# write_csv(TMean_mblm, "output_data/annualLongTerm/TMean_mblmAnnual_AprAug.csv")
 ```
 
 
 ### TRange
 
-```{r `fit regressions TRange`}
+```{r `fit regressions TRange`, warning= FALSE}
 #TRange
 
 ## --------------------------
@@ -793,13 +808,13 @@ for (i in 1:nrow(TRange_mblm)) {
   
 }
 
-#write_csv(TRange_mblm, "output_data/annualLongTerm/TRange_mblmAnnual_AprAug.csv")
+# write_csv(TRange_mblm, "output_data/annualLongTerm/TRange_mblmAnnual_AprAug.csv")
 ```
 
 
 ### TMax
 
-```{r `fit regressions TMax`}
+```{r `fit regressions TMax`, warning = FALSE}
 #TMax
 
 ## --------------------------
@@ -844,13 +859,13 @@ for (i in 1:nrow(TMax_mblm)) {
   
 }
 
-#write_csv(TMax_mblm, "output_data/annualLongTerm/TMax_mblmAnnual_AprAug.csv")
+# write_csv(TMax_mblm, "output_data/annualLongTerm/TMax_mblmAnnual_AprAug.csv")
 ```
 
 
 ### DOMin
 
-```{r `fit regressions DOMin`}
+```{r `fit regressions DOMin`, warning=FALSE}
 #DOMin
 
 ## --------------------------
@@ -895,13 +910,13 @@ for (i in 1:nrow(DOMin_mblm)) {
   
 }
 
-#write_csv(DOMin_mblm, "output_data/annualLongTerm/DOMin_mblmAnnual_AprAug.csv")
+# write_csv(DOMin_mblm, "output_data/annualLongTerm/DOMin_mblmAnnual_AprAug.csv")
 ```
 
 
 ### DOMean
 
-```{r `fit regressions DOMean`}
+```{r `fit regressions DOMean`, warning = FALSE}
 #DOMean
 
 ## --------------------------
@@ -946,13 +961,13 @@ for (i in 1:nrow(DOMean_mblm)) {
   
 }
 
-#write_csv(DOMean_mblm, "output_data/annualLongTerm/DOMean_mblmAnnual_AprAug.csv")
+# write_csv(DOMean_mblm, "output_data/annualLongTerm/DOMean_mblmAnnual_AprAug.csv")
 ```
 
 
 ### DORange
 
-```{r `fit regressions DORange`}
+```{r `fit regressions DORange`, warning = FALSE}
 #DORange
 
 ## --------------------------
@@ -997,13 +1012,13 @@ for (i in 1:nrow(DORange_mblm)) {
   
 }
 
-#write_csv(DORange_mblm, "output_data/annualLongTerm/DORange_mblmAnnual_AprAug.csv")
+# write_csv(DORange_mblm, "output_data/annualLongTerm/DORange_mblmAnnual_AprAug.csv")
 ```
 
 
 ### DOMax
 
-```{r `fit regressions DOMax`}
+```{r `fit regressions DOMax`, warning = FALSE}
 #DOMax
 
 ## --------------------------
@@ -1048,7 +1063,7 @@ for (i in 1:nrow(DOMax_mblm)) {
   
 }
 
-#write_csv(DOMax_mblm, "output_data/annualLongTerm/DOMax_mblmAnnual_AprAug.csv")
+# write_csv(DOMax_mblm, "output_data/annualLongTerm/DOMax_mblmAnnual_AprAug.csv")
 ```
 
 ### Combine to Single Dataframe
@@ -1064,7 +1079,7 @@ combined_data <- do.call(rbind, lapply(myvars, function(x) {
   get(x)
 }))
 
-write_csv(combined_data, "output_data/annualLongTerm/mblm_AprAug_allVariables.csv")
+# write_csv(combined_data, "output_data/annualLongTerm/mblm_AprAug_allVariables.csv")
 
 ```
 
@@ -1076,19 +1091,21 @@ write_csv(combined_data, "output_data/annualLongTerm/mblm_AprAug_allVariables.cs
 # but abline has no axis values associated, it is just an infinite line based on slope and intercept.
 # effectively plotting the mblm lines thus requires a geom_ layer to define the scales. 
 
-# also, field to color lines by slope significance must be added
+# also, a field to color lines by slope significance must be added to the data frame
+# var_class values set up to include units for facetting labels (i.e., with unicode characters for degree, sub/superscript)
 mblm_data <- combined_data %>%
   mutate(significant = if_else(model_pval <= .05 & model_slope > 0, "significant positive", 
                                if_else(model_pval <= .05 & model_slope < 0, "significant negative", "not significant"))
          ) %>%
-  mutate(var_class = ifelse(startsWith(variable, "T"), "Temperature", "Dissolved Oxygen")) %>%
+  mutate(var_class = ifelse(startsWith(variable, "T"), "Temperature (\u00B0C d\u207B\u00B9)", "Dissolved Oxygen (mg O\u2082 L\u207B\u00B9 d\u207B\u00B9)")) %>%
+  mutate(var_class = factor(var_class, levels = c("Temperature (\u00B0C d\u207B\u00B9)", "Dissolved Oxygen (mg O\u2082 L\u207B\u00B9 d\u207B\u00B9)"))) %>%
   mutate(var_type = case_when(
-    endsWith(variable, "Max") ~ "Max",
-    endsWith(variable, "Min") ~ "Min",
+    endsWith(variable, "Max") ~ "Surface",
+    endsWith(variable, "Min") ~ "Bottom",
     endsWith(variable, "Range") ~ "Range",
     endsWith(variable, "Mean") ~ "Mean",
-    TRUE ~ ""
-  ))
+    TRUE ~ "")) %>%
+  mutate(var_type = factor(var_type, levels = c("Surface", "Mean", "Bottom", "Range")))
 
 # set significant as factor to ensure sig lines sit on top of insignificant lines
 mblm_data$significant <- factor(mblm_data$significant, levels = c("significant positive", "significant negative", "not significant"))
@@ -1096,30 +1113,15 @@ mblm_data$significant <- factor(mblm_data$significant, levels = c("significant p
 # point plotting variable -- new var name so that it can be modified to remove outliers as needed without affecting the original data frame
 annualTrends.df <- slopes.df
 
-## The following was iterative, based on plotting and replotting using facet_grid and visually asessing the plots. For some reason scale = "free" did not actually allow for free scales, such that each row (and col?)
-# Remove outlier from TMAx to tighten the y axis range.
-#xoutlier <- annualTrends.df %>%
- # filter(variable == "TMax") %>%
- # summarize(min = min(model_slope))
-
-#outlier_index <- which(annualTrends.df$model_slope == xoutlier$min & annualTrends.df$variable == "TMax")
-
-#annualTrends.df$model_slope[outlier_index] <- NA
-
-# Remove max and min from TRange
-#xoutlier <- annualTrends.df %>%
- # filter(variable == "TRange") %>%
- # summarize(min = min(model_slope),
-          #  max = max(model_slope))
-
-#outlier_indices <- which((annualTrends.df$model_slope == xoutlier$min | annualTrends.df$model_slope == xoutlier$max) & annualTrends.df$variable == "TRange")
-
-#annualTrends.df$model_slope[outlier_indices] <- NA
-
 ```
 
 
+
 ```{r fig.width=7, fig.height=7}
+
+# exclude regression line for 2-XDD000.40 from the DOmax plot as this has a number of missing values in the time series.
+mblm_data <- mblm_data %>%
+  filter(!(variable == "DOMax" & StationID == "2-XDD000.40"))
 
 plot <- ggplot() +
   geom_point(data = annualTrends.df, aes(x = Year, y = model_slope), alpha = 0) +
@@ -1128,8 +1130,7 @@ plot <- ggplot() +
    labs(title = NULL,
        x = "Year",
        y = NULL) +  
-  facet_grid(var_class ~ var_type, scales = "free",
-             labeller = labeller(var_class = as_labeller(c("Dissolved Oxygen" = "Dissolved Oxygen (mg 02/L/day)", "Temperature" = "Temperature (C/day)")))) +
+  facet_grid(var_class ~ var_type, scales = "free", switch = "y") +
   scale_color_manual(values = c("not significant" = "grey72", 
                                 "significant positive" = "#C9A818", 
                                 "significant negative" = "#124E78")) +
@@ -1138,16 +1139,17 @@ plot <- ggplot() +
         panel.border = element_rect(colour = "black", fill=NA, size=.5),
         plot.title = element_text(size = 16),
         axis.title = element_text(size = 14), 
-        axis.text = element_text(size = 9.5), 
-        axis.text.x = element_text(angle = 45, hjust = .8),
+        axis.text.y = element_text(size = 9.5,  margin = margin(t = 0, r = 3, b = 0, l = 0)), 
+        axis.text.x = element_text(size = 9.5, angle = 45, hjust = .95),
         legend.text = element_text(size = 8),  
         legend.title = element_blank(),
         strip.text = element_text(size = 11),
+        strip.placement = "outside",
         panel.grid = element_line(color = "grey90", linewidth = .1),
         aspect.ratio = 1.8)
 
 plot(plot)
-ggsave("annualLongterm_plot_AprAug.jpg", plot)
+# ggsave("annualLongterm_plot_AprAugx.jpg", device = "jpg", plot, dpi = 1000)
 ```
 
 

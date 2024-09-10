@@ -1,0 +1,42 @@
+Station_Id,STR_STREAM_NAME,STA_DESC,Latitude,Longitude,VADEQ_ADMIN_REGION,Basin,Subbasin,STA_LV5_CODE,FIRST_SAMPLE_DATE,LAST_SAMPLE_DATE,COUNT
+2-JKS044.60,Jackson River,Dam - Lake Moomaw,37.947311,-79.963655,Blue Ridge,James River Basin,UPPER JAMES,,04/26/1983,10/27/2022,2868
+2-JKS046.40,Jackson River,Mouth Big Lick Cr. - Lake Moomaw,37.953825,-79.979393,Blue Ridge,James River Basin,UPPER JAMES,,04/26/1983,10/27/2022,2482
+2-JKS048.90,Jackson River,Bolar Mtn. Campground - Lake Moomaw,37.977911,-79.966996,Valley,James River Basin,UPPER JAMES,,04/26/1983,10/27/2022,1987
+2-JKS053.48,Jackson River,McClintic Pt. - Lake Moomaw,38.015102,-79.916573,Valley,James River Basin,UPPER JAMES,,04/26/1983,10/27/2022,533
+2-XDD000.40,Unnamed tributary to Chickahominy River (CHK),UT to CHK in pond at dam,37.691944,-77.538333,Piedmont,James River Basin,LOWER JAMES,,08/26/2003,12/07/2016,181
+4ABSA000.62,Bull Run,Mouth of Bull Run,37.027778,-79.633333,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,05/01/1985,10/24/2023,4545
+4ABWR002.50,Blackwater River,Lower Blackwater River - SML,37.038889,-79.615278,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,04/13/1983,10/24/2023,5214
+4ABWR010.55,Blackwater River,Middle Blackwater River - SML,37.040278,-79.702778,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,04/13/1983,10/24/2023,4391
+4ABWR017.42,Blackwater River,Upper Blackwater River - SML,37.063056,-79.744444,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,04/13/1983,10/24/2023,1490
+4ACCK001.80,Craddock Creek,Mouth Craddock Cr. - SML,37.062813,-79.568464,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,10/14/1987,10/25/2023,4538
+4ACOA000.60,Cool Branch,Cool Branch - SML,37.023056,-79.602222,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,05/01/1985,10/24/2023,4529
+4AGIL002.39,Gills Creek,Gills Creek - SML,37.065278,-79.687500,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,05/10/1984,10/24/2023,2583
+4AROA018.36,Roanoke River,BUOY 1 - JOHN H. KERR RESERVOIR,36.594167,-78.301111,Piedmont,Roanoke River Basin,MIDDLE ROANOKE,,05/10/1974,10/26/2023,1967
+4AROA038.49,Roanoke River,STA # 20 KR - RT. 49/58/15 BRIDGE - KERR,36.630250,-78.549444,Piedmont,Roanoke River Basin,MIDDLE ROANOKE,,07/11/1968,10/26/2023,880
+4AROA140.66,Roanoke River,LEESVILLE  LK #1A-TOP #1B-MIDDLE #1C-BOT,37.091667,-79.404167,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,07/14/1977,10/16/2023,1872
+4AROA145.34,Roanoke River,LEESVILLE LK #2A-RMP BEDFORD/CAMPBELL CO,37.056389,-79.446389,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,07/14/1977,10/16/2023,1554
+4AROA158.22,Roanoke River,Dam - SML,37.045743,-79.539866,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,04/13/1983,10/25/2023,5840
+4AROA163.76,Roanoke River,Confl. Blackwater River - SML,37.046394,-79.587797,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,04/13/1983,10/25/2023,5400
+4AROA167.34,Roanoke River,Buoy R12 - SML,37.069511,-79.606521,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,04/24/1985,10/25/2023,5363
+4AROA175.63,Roanoke River,Hales Ford - SML,37.147403,-79.670989,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,07/07/1971,10/04/2023,5361
+4AROA180.21,Roanoke River,Confl. Indian Cr. - SML,37.149081,-79.700377,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,04/24/1985,10/04/2023,4738
+4AROA183.64,Roanoke River,Confl. Beaverdam Cr. - SML,37.192684,-79.724041,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,04/25/1983,10/04/2023,3620
+4AROA192.55,Roanoke River,"SMITH MTN. LAKE, HARDYS FORD",37.220000,-79.798889,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,DEACT,07/07/1971,11/06/2012,443
+4AROA192.94,Roanoke River,HARDY FORD - SML,37.217600,-79.800080,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,04/25/1983,10/04/2023,881
+4AROA196.05,Roanoke River,McVeigh Ford - SML,37.218982,-79.830328,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,DEACT,07/07/1971,10/14/2020,637
+4ASRE046.90,Smith River,Dam - Philpott Res.,36.782697,-80.029189,Blue Ridge,Roanoke River Basin,UPPER DAN,,07/06/1971,10/02/2023,2757
+4ASRE048.98,Smith River,Goose Point - Philpott Res.,36.803453,-80.046244,Blue Ridge,Roanoke River Basin,UPPER DAN,,04/12/1983,10/02/2023,2592
+4ASRE052.31,Smith River,"#3A,#3B,#3C HORSEHOE POINT - TOP,MIDDLE,",36.830302,-80.072285,Blue Ridge,Roanoke River Basin,UPPER DAN,,07/27/1977,06/17/2019,2182
+4ASRE056.06,Smith River,Union Bridge - Phipott Res.,36.846464,-80.101204,Blue Ridge,Roanoke River Basin,UPPER DAN,,04/01/1983,10/02/2023,1452
+4AWTH000.40,Withcer Creek,Mouth of Witcher Cr. - SML,37.057778,-79.535556,Blue Ridge,Roanoke River Basin,UPPER ROANOKE,,10/14/1987,10/25/2023,4651
+5ASRN000.66,Spring Branch,Bryants Pond above dam,37.060556,-77.078889,Piedmont,Chowan and Dismal Swamp River Basin,BLACKWATER,,05/11/2004,12/07/2016,142
+6ACNR000.00,Cranesnest River,AT MOUTH CRANESNEST RIVER,37.213194,-82.376583,Southwest,Tennessee and Big Sandy River Basin,UPPER LEVISA,,06/26/1974,10/08/1991,241
+6APNR008.15,Pound River,John Flannagan Reservoir ~2 MI upstr CNR,37.219222,-82.394250,Southwest,Tennessee and Big Sandy River Basin,UPPER LEVISA,,05/10/1973,11/13/1991,251
+8-NAR047.69,North Anna River,Lake Anna - Upstream from Rt. 208 Bridge,38.086111,-77.815278,Northern,York River Basin,PAMUNKEY,,04/28/2003,11/13/2023,1487
+8-NAR054.17,North Anna River,LAKE ANNA -  Upstream Rt. 719 Bridge,38.111944,-77.886389,Northern,York River Basin,PAMUNKEY,,06/25/1996,11/13/2023,877
+9-NEW087.14,New River,Dam - Claytor Lake,37.073960,-80.589305,Blue Ridge,New River Basin,UPPER NEW,,05/22/1972,10/03/2023,5555
+9-NEW089.34,New River,State Park - Claytor Lake,37.051918,-80.618327,Blue Ridge,New River Basin,UPPER NEW,,05/22/1972,10/03/2023,4791
+9-NEW092.66,New River,Dublin Water Works - Claytor Lake,37.067190,-80.648664,Blue Ridge,New River Basin,UPPER NEW,,05/22/1972,10/03/2023,4702
+9-NEW098.32,New River,Shop Eez boat ramp off Rt. 672,37.002500,-80.683056,Blue Ridge,New River Basin,UPPER NEW,,05/22/1972,01/24/2024,2426
+9-PKC000.00,Peak Creek,Mouth Peak Cr. - Claytor Lake,37.048561,-80.673397,Blue Ridge,New River Basin,UPPER NEW,,07/30/1979,10/03/2023,3924
+9-PKC004.16,Peak Creek,Peak Creek - Conrad Bros. - Claytor Lake,37.047467,-80.709546,Blue Ridge,New River Basin,UPPER NEW,,07/30/1979,10/03/2023,683

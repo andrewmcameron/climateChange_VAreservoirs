@@ -1,0 +1,66 @@
+---
+title: "Identifying Lakes in the Richmond MSA"
+author: "Andrew Cameron"
+date: "2024-07-25"
+output: html_document
+---
+
+Objective: Identify lakes/bodies of water throughout the Richmond MSA (17 counties/independent cities). 
+
+Data Sources: 
+
+*VGIN 1m Land Cover* - DOwnloaded raster tiles from three regions (Souther Lankes, Bay Area 1, Bay Area 2). Sorted through tiles until the Richmond MSA was identified. Mosaicked together the tiles to create a single raster file, then extracted by mask to isolate LC within RMSA.
+*Richmond MSA polygon feature service* (https://www.arcgis.com/home/item.html?id=7f8608739059413791a6280b9b3fe56f)
+
+
+```{r}
+library(tidyverse)
+library(arcgisbinding)
+arc.check_product()
+#The following, copied using  "copy folder path to clipboard" in the files pane, did *not work* to construct path to feature class:
+###    "~/Desktop/arc_VA Reservoirs - Climate Change/VA Reservoirs - Climate Change.gdb"
+
+# function to streamline arc to data frame
+arc2df <- function(gdb, fc){
+  x <- arc.open(file.path(gdb, fc))
+  df <- arc.select(x)
+  return(df)
+}
+
+gdb <- "C:/Users/andre/Desktop/arc_VA Reservoirs - Climate Change/VA Reservoirs - Climate Change.gdb"
+df <- arc2df(gdb, "lakesPonds_metroRVA_final")
+
+
+#align schemas to allow for binding.
+
+
+lakesPonds <- df %>%
+  mutate(area_ha = round(area_ha, 2)) %>%
+  mutate(areasqkm = round(areasqkm, 2)) %>%
+  mutate(ftype = "390 (Lake/Pond)") %>%
+  mutate(hydrographic_status = case_when(
+    fcode == 39001 ~ "Intermittent", 
+    fcode == 39004 ~ "Perennial", 
+    fcode == 39009 ~ "Perennial; Average Water Elevation", 
+    TRUE ~ "Unknown")) %>%
+  select(-OBJECTID) %>%
+  rename(area_km2 = areasqkm) %>%
+  relocate(c(ftype, fcode, hydrographic_status), .before = permanent_identifier) %>%
+  relocate(area_ha, .after = county) %>%
+  relocate(gnis_name, .after = permanent_identifier) %>%
+  relocate(gnis_id, .after = gnis_name) %>%
+  relocate(area_km2, .after = area_ha) %>%
+  arrange(desc(area_ha))
+
+lakesPonds
+
+
+write_csv(lakesPonds, "lakesPonds_RVAMetro.csv")
+
+
+
+
+
+
+
+```

@@ -1,20 +1,38 @@
 ---
 title: "Assessing Climate Change Effects in VA Reservoirs"
-subtitle: "Part 3: Deriving Trends for Dissolved Oxygen Min, Mean, Range"
+subtitle: "Part 3: Deriving Trends for Dissolved Oxygen (DOMax, DOMin, DOMean, DORange)"
 author: "Andrew Cameron"
-output: html_document
+output:  
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=TRUE, warning=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+# Install any missing packages
+install_packages <- function(packages) {
+  new_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+  if(length(new_packages) > 0) {
+    install.packages(new_packages, dependencies = TRUE)
+  }
+}
+
+packages <- c("ggplot2", "tidyverse", "mblm")
+install_packages(packages)
+
+library(ggplot2)
 library(tidyverse)
+library(mblm)
 ```
 
-## Data Preprocessing 
+## Data Preprocessing
 
 ```{r `read in data`}
-trendSites.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
-allData.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3)
+trendSites.df <- openxlsx::read.xlsx("input_data/data_original.xlsx", sheet = 2)
+allData.df <- openxlsx::read.xlsx("input_data/data_original.xlsx", sheet = 3)
 
 # Convert `date` column from Excel encoded date to a more legible date format. Otherwise date shows as numeric value, e.g. '44230'.
     allData.df$Date <- allData.df$Date * 86400      # 86400 = seconds in a day.
@@ -96,7 +114,6 @@ insufficient_Nobs <- insufficient_Nobs$key
 
 ```
 
- 
 ## Minimum Dissovled Oxygen
 
 ```{r `derive DOMin by month` }
@@ -119,11 +136,8 @@ df.DOMin <- subset.df %>%
 
 ```
 
-```{r `fit regressions for each month-station`, warning=TRUE}
+```{r `DOMin fit regressions for each month-station`, warning=FALSE}
 # fit a linear regression for DOMean vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
-
-# install.packages("mblm")
-library(mblm)
 
 #Usage
 #mblm(formula, dataframe, repeated = TRUE)
@@ -152,23 +166,46 @@ for (station_id in unique(df.DOMin$FDT_STA_ID)) {
       modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
         )
   }
 }
+
+## --------DOMin, with 1975 as y intercept-------------
+q <- df.DOMin %>%
+  mutate(Year1975 = Year - 1975) %>%
+  filter(MonthNum == 8)
+
+modelSummaries_DOMin1975 <- list()
+
+for (station_id in unique(q$FDT_STA_ID)) {
+      data = subset(q, FDT_STA_ID == station_id)
+      model <- mblm(DOMin ~ Year1975, data = data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_DOMin1975[[paste(station_id)]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year1975", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year1975", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
 
 # mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
 
 ```
 
-
-```{r `add reg stats to summary df`}
+```{r `DOMin add reg stats to summary df`}
 # create station-month key
 monthlyDOMin <- monthlyDOMin %>%
   mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
           model_slope = NA,
           model_MAD = NA,
-          model_pval = NA)
+          model_pval = NA,
+          model_intercept = NA)
 
 for (i in 1:nrow(monthlyDOMin)) {
   key = monthlyDOMin$key[i]
@@ -176,14 +213,37 @@ for (i in 1:nrow(monthlyDOMin)) {
   monthlyDOMin$model_slope[i] <-  modelSummaries[[key]]$slope
    monthlyDOMin$model_MAD[i] <-  modelSummaries[[key]]$MAD
     monthlyDOMin$model_pval[i] <-  modelSummaries[[key]]$pvalue
+      monthlyDOMin$model_intercept[i] <-  modelSummaries[[key]]$intercept
+  
+}
+
+DOMin_final <- monthlyDOMin %>%
+  filter(!key %in% insufficient_Nobs)
+
+#--------------------------------------------
+# reg stats for August DOMin non-normalized with 1975 as y intercept
+monthly_DOMin1975 <- monthlyDOMin %>%
+  mutate( model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA) %>%
+  filter(MonthNum == 8)
+
+for (i in 1:nrow(monthly_DOMin1975)) {
+  key = monthly_DOMin1975$FDT_STA_ID[i]
+  
+  monthly_DOMin1975$model_slope[i] <-  modelSummaries_DOMin1975[[key]]$slope
+   monthly_DOMin1975$model_MAD[i] <-  modelSummaries_DOMin1975[[key]]$MAD
+    monthly_DOMin1975$model_pval[i] <-  modelSummaries_DOMin1975[[key]]$pvalue
+     monthly_DOMin1975$model_intercept[i] <-  modelSummaries_DOMin1975[[key]]$intercept
   
 }
 
 
-monthlyDOMin %>%
-  filter(!key %in% insufficient_Nobs) %>%
-  select(-key) -> DOMin_final
+DOMin1975_final <- monthly_DOMin1975 %>%
+  filter(!key %in% insufficient_Nobs)
 
+#------------------------------------------------
 write_csv(DOMin_final, "output_data/DOMin_mblmModelStatistics.csv")
 
 # do any month-stations return a 0 slope with sig pval? In this case, no
@@ -193,7 +253,6 @@ wonky_results <- DOMin_final %>%
 paste(nrow(wonky_results), "station-months returned a slope of 0 with a significant p-value in DOMin trend analysis.", sep=" ")
 
 ```
-
 
 ## Mean Dissovled Oxygen
 
@@ -216,11 +275,8 @@ df.DOMean <- subset.df %>%
   select(all_of(cols_to_keep), Mean)
 ```
 
-```{r `fit regressions for each month-station`, warning = TRUE}
+```{r `DOMean fit regressions for each month-station`, warning = FALSE}
 # fit a linear regression for DOMean vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
-
-# install.packages("mblm")
-library(mblm)
 
 #Usage
 #mblm(formula, dataframe, repeated = TRUE)
@@ -250,23 +306,46 @@ for (station_id in unique(df.DOMean$FDT_STA_ID)) {
       modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
         )
   }
 }
+
+## --------DOMin, with 1975 as y intercept-------------
+q <- df.DOMean %>%
+  mutate(Year1975 = Year - 1975) %>%
+  filter(MonthNum == 8)
+
+modelSummaries_DOMean1975 <- list()
+
+for (station_id in unique(q$FDT_STA_ID)) {
+      data = subset(q, FDT_STA_ID == station_id)
+      model <- mblm(DOMean ~ Year1975, data = data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_DOMean1975[[paste(station_id)]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year1975", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year1975", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
 
 # mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
 
 ```
 
-
-```{r `add reg stats to summary df`}
+```{r `DOMean add reg stats to summary df`}
 # create station-month key
 monthlyDOMean <- monthlyDOMean %>%
   mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
           model_slope = NA,
           model_MAD = NA,
-          model_pval = NA)
+          model_pval = NA,
+          model_intercept = NA)
 
 for (i in 1:nrow(monthlyDOMean)) {
   key = monthlyDOMean$key[i]
@@ -274,13 +353,38 @@ for (i in 1:nrow(monthlyDOMean)) {
   monthlyDOMean$model_slope[i] <-  modelSummaries[[key]]$slope
    monthlyDOMean$model_MAD[i] <-  modelSummaries[[key]]$MAD
     monthlyDOMean$model_pval[i] <-  modelSummaries[[key]]$pvalue
+    monthlyDOMean$model_intercept[i] <-  modelSummaries[[key]]$intercept
   
 }
 
 
-monthlyDOMean %>%
-  filter(!key %in% insufficient_Nobs) %>%
-  select(-key) -> DOMean_final
+DOMean_final <- monthlyDOMean %>%
+  filter(!key %in% insufficient_Nobs)
+
+#--------------------------------------------
+# reg stats for August DOMean non-normalized with 1975 as y intercept
+monthly_DOMean1975 <- monthlyDOMean %>%
+  mutate( model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA) %>%
+  filter(MonthNum == 8)
+
+for (i in 1:nrow(monthly_DOMean1975)) {
+  key = monthly_DOMean1975$FDT_STA_ID[i]
+  
+  monthly_DOMean1975$model_slope[i] <-  modelSummaries_DOMean1975[[key]]$slope
+   monthly_DOMean1975$model_MAD[i] <-  modelSummaries_DOMean1975[[key]]$MAD
+    monthly_DOMean1975$model_pval[i] <-  modelSummaries_DOMean1975[[key]]$pvalue
+     monthly_DOMean1975$model_intercept[i] <-  modelSummaries_DOMean1975[[key]]$intercept
+  
+}
+
+
+DOMean1975_final <- monthly_DOMean1975 %>%
+  filter(!key %in% insufficient_Nobs)
+
+#------------------------------------------------
 
 write_csv(DOMean_final, "output_data/DOMean_mblmModelStatistics.csv")
 
@@ -314,11 +418,8 @@ df.DORange <- subset.df %>%
 
 ```
 
-```{r `fit regressions for each month-station`, warning = FALSE}
+```{r `DORange fit regressions for each month-station`, warning = FALSE}
 # fit a linear regression for DORange vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
-
-# install.packages("mblm")
-library(mblm)
 
 #Usage
 #mblm(formula, dataframe, repeated = TRUE)
@@ -347,23 +448,46 @@ for (station_id in unique(df.DORange$FDT_STA_ID)) {
       modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
         )
   }
 }
+
+## --------DORange, with 1975 as y intercept-------------
+q <- df.DORange %>%
+  mutate(Year1975 = Year - 1975) %>%
+  filter(MonthNum == 8)
+
+modelSummaries_DORange1975 <- list()
+
+for (station_id in unique(q$FDT_STA_ID)) {
+      data = subset(q, FDT_STA_ID == station_id)
+      model <- mblm(DORange ~ Year1975, data = data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_DORange1975[[paste(station_id)]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year1975", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year1975", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
 
 # mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
 
 ```
 
-
-```{r `add reg stats to summary df`}
+```{r `DORange add reg stats to summary df`}
 # create station-month key
 monthlyDORange <- monthlyDORange %>%
   mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
           model_slope = NA,
           model_MAD = NA,
-          model_pval = NA)
+          model_pval = NA,
+          model_intercept = NA)
 
 for (i in 1:nrow(monthlyDORange)) {
   key = monthlyDORange$key[i]
@@ -371,13 +495,38 @@ for (i in 1:nrow(monthlyDORange)) {
   monthlyDORange$model_slope[i] <-  modelSummaries[[key]]$slope
    monthlyDORange$model_MAD[i] <-  modelSummaries[[key]]$MAD
     monthlyDORange$model_pval[i] <-  modelSummaries[[key]]$pvalue
+     monthlyDORange$model_intercept[i] <-  modelSummaries[[key]]$intercept
   
 }
 
 
-monthlyDORange %>%
-  filter(!key %in% insufficient_Nobs) %>%
-  select(-key) -> DORange_final
+DORange_final <- monthlyDORange %>%
+  filter(!key %in% insufficient_Nobs)
+
+#--------------------------------------------
+# reg stats for August DORange non-normalized with 1975 as y intercept
+monthly_DORange1975 <- monthlyDORange %>%
+  mutate( model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA) %>%
+  filter(MonthNum == 8)
+
+for (i in 1:nrow(monthly_DORange1975)) {
+  key = monthly_DORange1975$FDT_STA_ID[i]
+  
+  monthly_DORange1975$model_slope[i] <-  modelSummaries_DORange1975[[key]]$slope
+   monthly_DORange1975$model_MAD[i] <-  modelSummaries_DORange1975[[key]]$MAD
+    monthly_DORange1975$model_pval[i] <-  modelSummaries_DORange1975[[key]]$pvalue
+     monthly_DORange1975$model_intercept[i] <-  modelSummaries_DORange1975[[key]]$intercept
+  
+}
+
+
+DORange1975_final <- monthly_DORange1975 %>%
+  filter(!key %in% insufficient_Nobs)
+
+#------------------------------------------------
 
 write_csv(DORange_final, "output_data/DORange_mblmModelStatistics.csv")
 
@@ -386,10 +535,191 @@ wonky_results <- DORange_final %>%
   filter(model_slope == 0 & model_pval <= 0.05)
 
 paste(nrow(wonky_results), "station-months returned a slope of 0 with a significant p-value in DORange trend analysis.", sep=" ")
-
-wonky_results
 ```
 
+## Max Dissolved Oxygen
+
+```{r `derive DOMax by month`, message = FALSE }
+# This does not require filtering; surface only measurements are fine (?)
+# Subset data more inclusively than in above calcs
+
+DOMax.df <- allData.df %>%
+  mutate(MonthNum = lubridate::month(Date),
+         Year = lubridate::year(Date)) %>%
+  filter(FDT_STA_ID %in% station_IDS) %>%
+  filter(!FDT_STA_ID %in% c("6APNR008.15", "6ACNR000.00")) %>%
+  filter(MonthNum %in% 5:10)
+
+countPerGroup_domax <- DOMax.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarise(Nobs = n()) %>%
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_"))
+
+insufficient_Nobs_domax <- countPerGroup_domax %>%
+  filter(Nobs < 10)
+
+insufficient_Nobs_domax <- insufficient_Nobs_domax$key
+
+#--------------------------
+
+monthlyDOMax <- DOMax.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarize(Mean = mean(DOMax, na.rm = TRUE),
+            Min = min(DOMax, na.rm = TRUE),
+            Max = max(DOMax, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop') %>%
+  mutate(Month = month.name[MonthNum])
+
+ # write_csv(monthlyDOMin, "output_data/DOMin_stats_monthlyByStation.csv")
+
+cols_to_keep <- colnames(DOMax.df)
+
+df.DOMax <- DOMax.df %>%
+  left_join(monthlyDOMax, by = c("FDT_STA_ID", "MonthNum")) %>%
+  select(all_of(cols_to_keep), Mean) 
+
+```
+
+```{r `DOMax fit regressions for each month-station_DOMax`, warning=FALSE}
+# fit a linear regression for DOMean vs. year by month-station using the mblm function (median based linear model) as this is thought to be less sensitive to outliers.
+
+#Usage
+#mblm(formula, dataframe, repeated = TRUE)
+  #Arguments
+    #formula A formula of type y ~ x (only linear models are accepted)
+    #dataframe Optional dataframe
+    #repeated If set to true, model is computed using repeated medians. If false, a single median estimators are calculated
+
+# remove NA values -- mblm() does not handle NA as lm() does
+df.DOMax <- df.DOMax %>%
+  filter(!is.na(DOMax))
+
+# create list to store regression results
+modelSummaries <- list()
+
+for (station_id in unique(df.DOMax$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- df.DOMax %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(DOMax ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+}
+
+## --------DOMax, with 1975 as y intercept-------------
+q <- df.DOMax %>%
+  mutate(Year1975 = Year - 1975) %>%
+  filter(MonthNum == 8)
+
+modelSummaries_DOMax1975 <- list()
+
+for (station_id in unique(q$FDT_STA_ID)) {
+      data = subset(q, FDT_STA_ID == station_id)
+      model <- mblm(DOMax ~ Year1975, data = data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_DOMax1975[[paste(station_id)]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year1975", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year1975", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
+
+
+# mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
+
+```
+
+```{r `DOMax add reg stats to summary df_DOMax`}
+# create station-month key
+monthlyDOMax <- monthlyDOMax %>%
+  mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA)
+
+for (i in 1:nrow(monthlyDOMax)) {
+  key = monthlyDOMax$key[i]
+  
+  monthlyDOMax$model_slope[i] <-  modelSummaries[[key]]$slope
+   monthlyDOMax$model_MAD[i] <-  modelSummaries[[key]]$MAD
+    monthlyDOMax$model_pval[i] <-  modelSummaries[[key]]$pvalue
+     monthlyDOMax$model_intercept[i] <-  modelSummaries[[key]]$intercept
+  
+}
+
+
+DOMax_final <- monthlyDOMax %>%
+  filter(!key %in% insufficient_Nobs)
+
+#--------------------------------------------
+# reg stats for August DOMax non-normalized with 1975 as y intercept
+monthly_DOMax1975 <- monthlyDOMax %>%
+  mutate( model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA) %>%
+  filter(MonthNum == 8)
+
+for (i in 1:nrow(monthly_DOMax1975)) {
+  key = monthly_DOMax1975$FDT_STA_ID[i]
+  
+  monthly_DOMax1975$model_slope[i] <-  modelSummaries_DOMax1975[[key]]$slope
+   monthly_DOMax1975$model_MAD[i] <-  modelSummaries_DOMax1975[[key]]$MAD
+    monthly_DOMax1975$model_pval[i] <-  modelSummaries_DOMax1975[[key]]$pvalue
+     monthly_DOMax1975$model_intercept[i] <-  modelSummaries_DOMax1975[[key]]$intercept
+  
+}
+
+
+DOMax1975_final <- monthly_DOMax1975 %>%
+  filter(!key %in% insufficient_Nobs)
+
+#------------------------------------------------
+
+write_csv(DOMax_final, "output_data/DOMax_mblmModelStatistics.csv")
+
+# do any month-stations return a 0 slope with sig pval? In this case, no
+wonky_results <- DOMax_final %>%
+  filter(model_slope == 0 & model_pval <= 0.05)
+
+paste(nrow(wonky_results), "station-months returned a slope of 0 with a significant p-value in DOMax trend analysis.", sep=" ")
+
+```
+
+### Single df with all 1975 y intercept model results
+
+```{r}
+a <- DOMin1975_final %>%
+  mutate(variable = "DOMin")
+b <- DOMean1975_final %>%
+  mutate(variable = "DOMean")
+c <- DORange1975_final %>%
+  mutate(variable = "DORange")
+d <- DOMax1975_final %>%
+  mutate(variable = "DOMax")
+
+e <- rbind(a, b, c, d)
+
+readr::write_csv(e, "output_data/1975_y_intercept_DOVars_model_results.csv")
+
+
+```
 
 ## Data viz
 
@@ -450,7 +780,6 @@ ggsave("output_data/DOMin_variationByMonth.jpg")
 
 ```
 
-
 ### DOMean
 
 ```{r}
@@ -488,5 +817,3 @@ ggplot(DORange_plot.df, aes(x = Month, y = model_slope, fill = Month)) +
 ggsave("output_data/DORange_variationByMonth.jpg")
 
 ```
-
-

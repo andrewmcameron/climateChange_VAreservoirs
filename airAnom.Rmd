@@ -1,0 +1,285 @@
+---
+title: "Air Temperature mblm"
+author: "Andrew Cameron"
+date: "2024-07-09"
+output: html_document
+---
+
+````{r setup, include=FALSE}
+library(tidyverse)
+
+##  have pulled in NOAA monthly average air temperatures for the 4 climate regions that contain the majority of our reservoirs.  Could you run mblm regressions on the air temperature anomalies (data in attached file)?  
+## The mblms should be run by month, which would yield a total of 48 regressions across the 4 divisions.
+## I don't think I'll need a figure for this as our paper already has 11 figures (I usually aim for 7-10), but hopefully I can describe the results in a paragraph of text.
+
+```
+
+```{r `Accessing historical NOAA temp data`}
+downloaded_file <- "climdiv-tmaxdv-v1.0.0-20240705.txt" # file path for downloaded file
+url <- "https://www.ncei.noaa.gov/data/nclimdiv-monthly/access/climdiv-tmpcdv-v1.0.0-20240705"
+
+# Download the data
+download.file(url, destfile = downloaded_file, method = "auto")
+
+# Read into R
+data <- read.table(downloaded_file, header = FALSE, sep = "", stringsAsFactors = FALSE)
+
+# Clean up the data, filter for Virginia divisions 2, 3, 5,6
+colnames(data) <- c("ID", month.abb)
+data$Year <- as.numeric(substr(data$ID, 7,10))
+
+
+VA_only <- data %>%
+  filter(substr(ID, 1, 4) %in% c("4402", "4403", "4405", "4406")) %>%
+  filter(Year >= 1970 & Year <=2023) %>%
+  mutate(division = case_when(
+    substr(ID, 1, 4) == "4402" ~ "VADiv2",
+    substr(ID, 1, 4) == "4403" ~ "VADiv3",
+    substr(ID, 1, 4) == "4405" ~ "VADiv5",
+    substr(ID, 1, 4) == "4406" ~ "VADiv6",
+    TRUE ~ NA_character_    # default to NA of type char if no cases match
+  )) %>%
+  mutate(across(2:13, ~ (. - 32) * 5 / 9))
+
+long_data <- VA_only %>%
+  pivot_longer(cols = 2:13, names_to = "Month", values_to = "Temp")
+
+
+# Calculate long term monthly averages within divisions and create a "longTermAvg" column and populate it with the appropriate month/division mean temp value
+ q <- long_data %>%
+  left_join(long_data %>%
+              group_by(division, Month) %>%
+              summarize(longTermAvg = mean(Temp, na.rm = TRUE)) %>%
+              select(division, Month, longTermAvg),
+            by = c("division", "Month"))
+ 
+ # Calculate temp anomalies for each month-year
+df.final <- q %>%
+  mutate(TempAnom = Temp - longTermAvg)
+
+write.csv(df.final, "input_AirTempData_1970_2023.csv")
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+air.data <- openxlsx::read.xlsx("air_data.xlsx", sheet = 2)
+
+air.data %>%
+  group_by(Month) %>%
+  summarize(n())
+
+## 21 obs per regression
+
+```
+
+```{r `fit regressions for each month-region`}
+library(mblm)
+
+#Usage
+#mblm(formula, dataframe, repeated = TRUE)
+  #Arguments
+    #formula A formula of type y ~ x (only linear models are accepted)
+    #dataframe Optional dataframe
+    #repeated If set to true, model is computed using repeated medians. If false, a single median estimators are calculated
+
+
+# create list to store regression results
+div2_airAnom <- list()
+div3_airAnom <- list()
+div5_airAnom <- list()
+div6_airAnom <- list()
+allDiv_airAnom <- list()
+
+
+# remove NA values -- mblm() does not handle NA as lm() does
+div2 <- df.final %>%
+  filter(division == "VADiv2") %>%
+  filter(!is.na(TempAnom)) # East Piedmont
+
+div3 <- df.final %>%
+  filter(division == "VADiv3") %>%
+  filter(!is.na(TempAnom))  # West Piedmont
+
+div5 <- df.final %>%
+  filter(division == "VADiv5") %>%
+  filter(!is.na(TempAnom))  # Central Mtn
+
+div6 <- df.final %>%
+  filter(division == "VADiv6") %>%
+  filter(!is.na(TempAnom))  # SW Mountain
+
+#all_div <- air.data %>%
+ # filter(!is.na(AllDivMeanAnom))
+
+## DIV 2 mblm
+
+  for (month in month.abb) {
+
+    month_region <- div2 %>%
+      filter(Month == month)
+
+      model <- mblm(TempAnom ~ Year, data = month_region)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      div2_airAnom[[paste("div2", month, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
+div2_df <- bind_rows(div2_airAnom)
+div2_final <- div2_df %>%
+  mutate(climate_region = "E Piedmont \n(Div 2)") %>%
+  mutate(month = as.numeric(gsub("div2_", "", rownames(.))))
+
+
+## DIV 3 mblm
+
+  for (month in month.abb) {
+
+    month_region <- div3 %>%
+      filter(Month == month)
+
+      model <- mblm(TempAnom ~ Year, data = month_region)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      div3_airAnom[[paste("div3", month, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
+div3_df <- bind_rows(div3_airAnom)
+div3_final <- div3_df %>%
+  mutate(climate_region = "W Piedmont \n(Div 3)") %>%
+  mutate(month = as.numeric(gsub("div3_", "", rownames(.))))
+
+## DIV 5 mblm
+
+  for (month in month.abb) {
+
+    month_region <- div5 %>%
+      filter(Month == month)
+
+      model <- mblm(TempAnom ~ Year, data = month_region)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      div5_airAnom[[paste("div5", month, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
+div5_df <- bind_rows(div5_airAnom)
+div5_final <- div5_df %>%
+  mutate(climate_region = "Central Mtns \n(Div 5)") %>%
+  mutate(month = as.numeric(gsub("div5_", "", rownames(.))))
+
+## DIV 6  mblm
+
+  for (month in month.abb) {
+
+    month_region <- div6 %>%
+      filter(Month == month)
+
+      model <- mblm(TempAnom ~ Year, data = month_region)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      div6_airAnom[[paste("div6", month, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
+div6_df <- bind_rows(div6_airAnom)
+div6_final <- div6_df %>%
+    mutate(climate_region = "SW Mtns \n(Div 6)") %>%
+  mutate(month = as.numeric(gsub("div6_", "", rownames(.))))
+
+mblm_results <- rbind(div2_final, div3_final, div5_final, div6_final)
+write_csv(mblm_results, "airTempAnom_mblm_1970_2023.csv")
+
+```
+
+```{r}
+## All Divisions
+for (month_num in 1:12) {
+
+    month_region <- all_div %>%
+      filter(Month == month_num)
+
+      model <- mblm(AllDivMeanAnom ~ Year, data = month_region)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      allDiv_airAnom[[paste("all_div", month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+}
+
+
+
+allDiv_df <- bind_rows(allDiv_airAnom)
+allDiv_final <- allDiv_df %>%
+  mutate(climate_region = "All Divisions") %>%
+  mutate(month = as.numeric(gsub("all_div_", "", rownames(.))))
+
+  
+
+mblm_results <- rbind(div2_final, div3_final, div5_final, div6_final, allDiv_final)
+
+write_csv(mblm_results, "air_anomaly_mblm.csv")
+
+
+mblm_results <- mblm_results %>%
+  mutate(significant = if_else(pvalue < 0.05, "significant", "not sig")) %>%
+  mutate(Month = factor(month, levels = 1:12, labels = month.abb)) %>%
+  mutate(climate_region = factor(climate_region, levels = c("E Piedmont \n(Div 2)", "W Piedmont \n(Div 3)", "Central Mtns \n(Div 5)", "SW Mtns \n(Div 6)", "All Divisions")))
+```
+
+```{r}
+
+library(ggplot2)
+
+ggplot(mblm_results, aes(x = Month, y = slope, color = significant)) +
+  geom_point(alpha = .99) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~climate_region) +
+  labs(title = NULL,
+       x = "Month",
+       y = "T Trend (°C Year\u207B\u00B9)",
+       color = NULL) +
+  theme_minimal() +
+  scale_color_manual(values = c("significant" = "salmon3", "not sig" = "grey22")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7.6),
+        panel.border = element_rect(colour = "black", fill=NA, size=.5))
+
+ggsave("airtemp_mblm.jpg", width = 8, height = 6, dpi = 750)
+
+```
+
+```{r}
+rat <- read_csv("vgin_landcover_RAT.csv")
+
+rat
+```

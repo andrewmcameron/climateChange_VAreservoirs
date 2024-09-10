@@ -1,0 +1,258 @@
+---
+title: "Publication Plot: TMax vs Distance (river miles)"
+author: "Andrew Cameron"
+date: "2024-06-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r `derive/prepare plotting data`, echo=FALSE, include=FALSE}
+# Create list containing trend results for each of the 7 variables
+files <- list.files("output_data/")
+mblm_files <- files[grepl("mblmModel", files)]
+path <- paste0(getwd(), "/output_data/")
+
+trends_list <- list()
+for (i in seq_along(mblm_files)) {
+  df <- read_csv(paste0(path, mblm_files[i]))
+  
+  file_name_prefix <- sub("_(.*)", "", mblm_files[i])
+  
+  trends_list[[file_name_prefix]] <- df
+}
+
+## ----------------------------------------------------------------------------
+# derive all months mean values and incorporate back into df for plotting
+trends_list <- lapply(
+  trends_list, 
+  function(df) {
+      all_months_mean <- df %>%
+        group_by(FDT_STA_ID) %>%
+        summarize(mean_slope = mean(model_slope, na.rm = TRUE), .groups = "drop") %>%
+        mutate(Month = "All Months",
+               trend = "N/A")
+      
+      # Combine the original df with all months summary
+      combined_df <- bind_rows(df, all_months_mean)
+    
+      # single column containing slopes (for use as y variable when plotting) -- currently "All Months" slopes are in their own column
+      combined_df <- combined_df %>%
+        mutate(model_slope = if_else(Month == "All Months", mean_slope, model_slope))
+      
+      # set month as factor and identify significant vs not significant trends
+      combined_df <- combined_df %>%
+        mutate(Month = factor(Month, levels = c("January", "February", "March", "April", 
+                                                "May", "June", "July", "August", "September", 
+                                                "October", "November", "December", "All Months")),
+              trend = ifelse(is.na(combined_df$model_pval), "N/A",
+                            ifelse(combined_df$model_pval <= 0.05, "significant", "not significant"))) 
+    
+      combined_df$trend <- factor(combined_df$trend, levels = c("significant", "not significant", "N/A"))
+    
+    return(combined_df)
+    })
+
+## -----------------------------------------------------------------------------
+# filter to include only the stations corresponding to reservoirs to be analyzed
+
+ids_moomaw <- c("2-JKS044.60", "2-JKS046.40", "2-JKS048.90", "2-JKS053.48")
+
+ids_philpott <- c("4ASRE046.90", "4ASRE048.98", "4ASRE052.31", "4ASRE056.06")
+
+ids_claytor <- c("9-NEW087.14", "9-NEW089.34", "9-NEW092.66", "9-NEW098.32")  # tributary stations "9-PKC000.00", "9-PKC004.16" excluded from regression analysis 
+
+ids_kerrEtal <- c("4AROA018.36", "4AROA038.49", "4AROA140.66", "4AROA145.34", "4AROA158.22", "4AROA163.76",
+                  "4AROA167.34", "4AROA175.63", "4AROA180.21", "4AROA183.64", "4AROA192.55", "4AROA192.94",
+                  "4AROA196.05")
+
+ids_SML <- c("4AROA158.22", "4AROA163.76", "4AROA167.34", "4AROA175.63", "4AROA180.21", "4AROA183.64", 
+             "4AROA192.55", "4AROA192.94", "4AROA196.05")
+
+ids_combined <- c(ids_moomaw, ids_philpott, ids_claytor, ids_kerrEtal, ids_SML)
+
+for (i in seq_along(trends_list)) {
+  df = trends_list[[i]]
+  
+  filtered_df <- df %>%
+    filter(FDT_STA_ID %in% ids_combined)
+  
+  trends_list[[i]] <- filtered_df
+}
+
+## -----------------------------------------------------------------------------
+# incorporate river mile (dependent  variable) into dfs
+## regex expression matching to extract the mileage values
+mileage_matches <- gregexpr("[0-9]+\\.[0-9]+", ids_combined)
+    ## regex explanation
+      # [0-9]: match any single digit from 1 to 9.
+      # 
+      # +: quantifier that matches one or more of the preceding element. In this case, match a sequence of 1 or more digits
+      # 
+      # \\.: matches a literal dot (.). Dot is normally is a special character that matches any single character (except newline characters). To match a literal dot, you need to escape it with a backslash, which itself must be escaped in order to read as a literal backslash.
+
+
+mileage_substrings <- regmatches(ids_combined, mileage_matches)
+
+river_miles <- data.frame(STATION_ID = ids_combined,
+                          RIVERMILE = unlist(mileage_substrings),
+                          RESERVOIR = c(rep("Moomaw", 4), rep("Philpott", 4), rep("Claytor", 4), rep("Kerr-Leesville-Smith Mountain", 13), rep("Smith Mountain", 9)))
+
+# remove leading 0 from any river mile value
+river_miles$RIVERMILE <- sub("^[0]+", "", river_miles$RIVERMILE)
+
+# Claytor Lake reservoir has two stations that are not along the main flow, instead on tributary that feeds into New River.
+# manually set Peak Creek tributary station values based on GIS measurement of distance from southernmost Claytor Lake station
+river_miles$RIVERMILE[c(13,14)] <- c("90.4", "94.1")
+
+# Set RIVERMILE field to numeric
+river_miles$RIVERMILE <- as.numeric(river_miles$RIVERMILE)
+
+trends_list <- lapply(trends_list, function(df) {
+  df %>% 
+    left_join(river_miles, by = c("FDT_STA_ID" = "STATION_ID"))
+})
+
+
+TMax <- trends_list[["TMax"]] 
+```
+
+## subset relevant data for plotting
+
+"includes only the All Month result (i.e., a single figure with 4 plots, one for each lake).
+Note we are only plotting the Surface T (Tmax) trends."
+
+```{r}
+subset.df <- TMax %>%
+  filter(Month == "All Months") %>%
+  filter(!RESERVOIR == "Kerr-Leesville-Smith Mountain") %>%  # ?? overlap with SML points -- include or not?
+  select(FDT_STA_ID, model_slope, model_pval, RIVERMILE, RESERVOIR) %>%
+  mutate(model_slope = model_slope * 10)  # convert to °C/decade
+
+# derive distance from dam
+claytor_diff <- 86.95
+smith_diff <- 157.32
+moo_diff <- 43.42
+phil_diff <- 46.57
+
+subset.df <- subset.df %>%
+  mutate(DAM_mile = case_when(
+    RESERVOIR == "Claytor" ~ RIVERMILE - claytor_diff,
+    RESERVOIR == "Smith Mountain" ~ RIVERMILE - smith_diff,
+    RESERVOIR == "Moomaw" ~ RIVERMILE - moo_diff,
+    RESERVOIR == "Philpott" ~ RIVERMILE - phil_diff
+  ))
+
+
+```
+
+## plot
+
+```{r fig.width=7, fig.height=7}
+library(ggh4x)
+
+scaleFUN <- function(x) sprintf("%.2f", x)
+
+ggplot(subset.df, aes(x = DAM_mile, y = model_slope)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  labs(title = NULL,
+       x = "Distance from dam (miles)",
+       y = "T Trend (°C decade\u207B\u00B9)") +
+  facet_wrap(~RESERVOIR, scales = "free", ncol = 2) +
+  facetted_pos_scales(
+    y = list(
+    RESERVOIR == "Moomaw" ~ scale_y_continuous(limits = c(-.04, .45), 
+                                                breaks = seq(0, 0.5, by = 0.15), 
+                                                labels = c("0", "0.15", "0.30", "0.45")),
+    RESERVOIR == "Claytor" ~ scale_y_continuous(limits = c(0.25, 0.55), 
+                                                breaks = seq(0., 0.6, by = 0.1), 
+                                                labels = scaleFUN),
+    RESERVOIR == "Philpott" ~ scale_y_continuous(limits = c(-.1, 0.75), 
+                                                breaks = seq(0, 0.6, by = 0.3), 
+                                                labels = c("0", "0.30", "0.60")),
+    RESERVOIR == "Smith Mountain" ~ scale_y_continuous(limits = c(-.1, 1.2),
+                                                       labels = c("0", "0.40", "0.80", "1.20"))
+    )) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),
+        axis.title = element_text(size = 14),
+        axis.text.y = element_text(size = 9.5,  margin = margin(t = 0, r = 2, b = 0, l = 0)), 
+        axis.text.x = element_text(size = 9.5, hjust = .95, margin = margin(t = 2, r = 0, b = 0, l = 0)),
+        legend.text = element_text(size = 8),  
+        legend.title = element_blank(),
+        strip.text = element_text(size = 11),
+        strip.placement = "outside",
+        panel.grid = element_line(color = "grey90", linewidth = .1),
+        panel.spacing.x = unit(1, "lines"),
+        panel.spacing.y = unit(1, "lines"),
+        aspect.ratio = .5)
+  
+
+ggsave("img/TMaxvDistance_miles.jpg", width = 7, height = 7, dpi = 1000)
+ggsave("img/TMaxvDistance_miles.svg", width = 7, height = 7)
+```
+
+same plot, but convert miles to km 
+
+```{r}
+subset.df <- subset.df %>%
+  mutate(RIVERMILEkm = RIVERMILE * 1.60934) %>%  # convert to km
+  mutate(DAM_km = DAM_mile * 1.60934)  # convert to km
+## derive distance from damn in KM
+
+
+
+ggplot(subset.df, aes(x = DAM_km, y = model_slope)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  labs(title = NULL,
+       x = "Distance from dam (km)",
+       y = "T Trend (°C decade\u207B\u00B9)") +
+  facet_wrap(~RESERVOIR, scales = "free", ncol = 2) +
+  facetted_pos_scales(y = list(
+    RESERVOIR == "Moomaw" ~ scale_y_continuous(limits = c(-.04, .45), 
+                                                breaks = seq(0, 0.5, by = 0.15), 
+                                                labels = c("0.00", "0.15", "0.30", "0.45")),
+    RESERVOIR == "Claytor" ~ scale_y_continuous(limits = c(0.25, 0.55), 
+                                                breaks = seq(0., 0.6, by = 0.1), 
+                                                labels = scaleFUN),
+    RESERVOIR == "Philpott" ~ scale_y_continuous(limits = c(-.1, 0.75), 
+                                                breaks = seq(0, 0.6, by = 0.3), 
+                                                labels = scaleFUN),
+    RESERVOIR == "Smith Mountain" ~ scale_y_continuous(limits = c(-.1, 1.2),
+                                                       labels = scaleFUN)
+    ),
+    x = list(
+      RESERVOIR == "Moomaw" ~ scale_x_continuous(limits = c(0, 16), 
+                                                breaks = seq(0, 15, by = 5))
+      )
+    )+
+  theme_minimal() +
+  theme(legend.position = "top",
+        panel.border = element_rect(colour = "black", fill=NA, size=.5),
+        plot.title = element_text(size = 16),
+        axis.title = element_text(size = 14),
+        axis.text.y = element_text(size = 9.5,  margin = margin(t = 0, r = 2, b = 0, l = 0)), 
+        axis.text.x = element_text(size = 9.5, hjust = .95, margin = margin(t = 2, r = 0, b = 0, l = 0)),
+        legend.text = element_text(size = 8),  
+        legend.title = element_blank(),
+        strip.text = element_text(size = 11),
+        strip.placement = "outside",
+        panel.grid = element_line(color = "grey90", linewidth = .1),
+        panel.spacing.x = unit(1, "lines"),
+        panel.spacing.y = unit(1, "lines"),
+        aspect.ratio = .5)
+  
+
+ggsave("img/TMaxvDistance_km.jpg", width = 7, height = 7, dpi = 1000)
+ggsave("img/TMaxvDistance_km.svg", width = 7, height = 7)
+
+
+```

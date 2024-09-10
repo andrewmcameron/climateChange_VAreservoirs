@@ -1,6 +1,6 @@
 ---
 title: "Assessing Climate Change Effects in VA Reservoirs"
-subtitle: "Part 1: Deriving Trends for Max Temperature (TMax)"
+subtitle: "Part 1: Deriving Surface Temperature (TMax) Trends by Month and Station"
 author: "Andrew Cameron"
 date: "2024-02-14"
 output: html_document
@@ -16,8 +16,9 @@ library(tidyverse)
 
 
 ```{r `read in data`}
-trendSites.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 2)
-allData.df <- openxlsx::read.xlsx("data_original.xlsx", sheet = 3)
+
+trendSites.df <- openxlsx::read.xlsx("input_data/data_original.xlsx", sheet = 2)
+allData.df <- openxlsx::read.xlsx("input_data/data_original.xlsx", sheet = 3)
 
 # Convert `date` column from Excel encoded date to a more legible date format. Otherwise date shows as numeric value, e.g. '44230'.
     allData.df$Date <- allData.df$Date * 86400      # 86400 = seconds in a day.
@@ -56,16 +57,16 @@ monthlyStation_stats <- subset.df %>%
 
 ```
 
-```{r `derive Temp Anomaly`}
-# The next step is to create a new variable in the Merged Profile & Meta Data dataset, which is the Temperature Anomaly. 
-# This is the difference between the observed temperature on a given date and the long-term average temperature. 
-# For example, for the first station (2-JKS044.60) the long-term mean surface T for May is 19.0, so you would subtract that from all May observations for this station (N=18). When the observed T is greater than mean T, this returns a positive number (above-average T), and when observed < average you get a negative anomaly.
+The next step is to create a new variable in the Merged Profile & Meta Data dataset, which is the **Temperature Anomaly**. 
+This is the difference between the observed temperature on a given date and the long-term average temperature. 
+For example, for the first station (2-JKS044.60), the long-term mean surface T (i.e., the long term MAX temp -- temps are hottest at the surface) for May is 19.0, so you would subtract that from all May observations for this station (N=18). When the observed T is greater than mean T, this returns a positive number (above-average T), and when observed < average you get a negative anomaly.
 
+```{r `derive Temp Anomaly`}
 cols_to_keep <- colnames(subset.df)
 
 subset.df <- subset.df %>%
   left_join(monthlyStation_stats, by = c("FDT_STA_ID", "MonthNum")) %>%
-  select(cols_to_keep, Mean) %>%
+  select(cols_to_keep, Mean, Nobs) %>%
   mutate(TAnomaly = TMax - Mean)  
 
 ```
@@ -87,10 +88,11 @@ subset.df$Year <- year(subset.df$Date)
 
 # remove NA values -- mblm() does not handle NA as lm() does
 subset.df <- subset.df %>%
-  filter(!is.na(TAnomaly))
+  filter(!is.na(TAnomaly)) %>%
+  filter(!is.na(TMax))
 
 # create list to store regression results
-modelSummaries <- list()
+modelSummaries_TMaxAnomaly <- list()
 
 for (station_id in unique(subset.df$FDT_STA_ID)) {
   for (month_num in 5:10) {
@@ -102,13 +104,59 @@ for (station_id in unique(subset.df$FDT_STA_ID)) {
       mod.sum <- summary.mblm(model)
       
       # store results
-      modelSummaries[[paste(station_id, month_num, sep = "_")]] <- list(
+      modelSummaries_TMaxAnomaly[[paste(station_id, month_num, sep = "_")]] <- list(
         slope = mod.sum$coefficients[2,1],
         MAD = mod.sum$coefficients["Year", "MAD"] ,
-        pvalue = mod.sum$coefficients["Year", 4]
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
         )
   }
 }
+
+# 6/4 Do the same as above, but for TMean non-normalized. This is needed for the data viz (August only trend line plots)
+modelSummaries_TMax <- list()
+
+for (station_id in unique(subset.df$FDT_STA_ID)) {
+  for (month_num in 5:10) {
+    
+    month_station <- subset.df %>%
+      filter(FDT_STA_ID == station_id & MonthNum == month_num)
+
+      model <- mblm(TMax ~ Year, data = month_station)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_TMax[[paste(station_id, month_num, sep = "_")]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+}
+
+## --------TMax, with 1975 as y intercept-------------
+
+q <- subset.df %>%
+  mutate(Year1975 = Year - 1975) %>%
+  filter(MonthNum == 8)
+
+modelSummaries_TMax1975 <- list()
+
+for (station_id in unique(q$FDT_STA_ID)) {
+      data = subset(q, FDT_STA_ID == station_id)
+      model <- mblm(TMax ~ Year1975, data = data)
+      mod.sum <- summary.mblm(model)
+      
+      # store results
+      modelSummaries_TMax1975[[paste(station_id)]] <- list(
+        slope = mod.sum$coefficients[2,1],
+        MAD = mod.sum$coefficients["Year1975", "MAD"] ,
+        pvalue = mod.sum$coefficients["Year1975", 4],
+        intercept = mod.sum$coefficients[1,1]
+        )
+  }
+
 
 # mblm does not return a standard error. Instead, summary.mblm can be used to extract the MAD or Median Absolute Deviation." It's a robust measure of variability that is less sensitive to outliers than the standard deviation, which is commonly used in traditional statistical analyses. 
 
@@ -117,26 +165,120 @@ for (station_id in unique(subset.df$FDT_STA_ID)) {
 
 ```{r `add reg stats to summary df`}
 # create station-month key
-monthlyStation_stats <- monthlyStation_stats %>%
+monthly_TMaxAnomaly <- monthlyStation_stats %>%
   mutate( key = paste(FDT_STA_ID, MonthNum, sep="_"),
           model_slope = NA,
           model_MAD = NA,
-          model_pval = NA)
+          model_pval = NA,
+          model_intercept = NA)
 
-for (i in 1:nrow(monthlyStation_stats)) {
-  key = monthlyStation_stats$key[i]
+for (i in 1:nrow(monthly_TMaxAnomaly)) {
+  key = monthly_TMaxAnomaly$key[i]
   
-  monthlyStation_stats$model_slope[i] <-  modelSummaries[[key]]$slope
-   monthlyStation_stats$model_MAD[i] <-  modelSummaries[[key]]$MAD
-    monthlyStation_stats$model_pval[i] <-  modelSummaries[[key]]$pvalue
+  monthly_TMaxAnomaly$model_slope[i] <-  modelSummaries_TMaxAnomaly[[key]]$slope
+   monthly_TMaxAnomaly$model_MAD[i] <-  modelSummaries_TMaxAnomaly[[key]]$MAD
+    monthly_TMaxAnomaly$model_pval[i] <-  modelSummaries_TMaxAnomaly[[key]]$pvalue
+     monthly_TMaxAnomaly$model_intercept[i] <-  modelSummaries_TMaxAnomaly[[key]]$intercept
   
 }
 
+#---------------------------------------------------
 
-monthlyStation_stats %>%
-  select(-key) -> df_final
+# Same as above, but for TMax non-normalized
+monthly_TMax <- monthlyStation_stats %>%
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_"),
+          model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA)
 
-# write_csv(df_final, "TMax_mblmModelStatistics.csv")
+for (i in 1:nrow(monthly_TMax)) {
+  key = monthly_TMax$key[i]
+  
+  monthly_TMax$model_slope[i] <-  modelSummaries_TMax[[key]]$slope
+   monthly_TMax$model_MAD[i] <-  modelSummaries_TMax[[key]]$MAD
+    monthly_TMax$model_pval[i] <-  modelSummaries_TMax[[key]]$pvalue
+     monthly_TMax$model_intercept[i] <-  modelSummaries_TMax[[key]]$intercept
+  
+}
+
+#--------------------------------------------
+# reg stats for August TRange with 1975 as y intercept
+monthly_TMax1975 <- monthly_TMax %>%
+  mutate( model_slope = NA,
+          model_MAD = NA,
+          model_pval = NA,
+          model_intercept = NA) %>%
+  filter(MonthNum == 8)
+
+for (i in 1:nrow(monthly_TMax1975)) {
+  key = monthly_TMax1975$FDT_STA_ID[i]
+  
+  monthly_TMax1975$model_slope[i] <-  modelSummaries_TMax1975[[key]]$slope
+   monthly_TMax1975$model_MAD[i] <-  modelSummaries_TMax1975[[key]]$MAD
+    monthly_TMax1975$model_pval[i] <-  modelSummaries_TMax1975[[key]]$pvalue
+     monthly_TMax1975$model_intercept[i] <-  modelSummaries_TMax1975[[key]]$intercept
+  
+}
+
+monthly_TMax1975 <- monthly_TMax1975 %>%
+  mutate(variable = "TMax")
+
 ```
 
+```{r `write out data`}
 
+#write_csv(monthly_TMaxAnomaly, "output_data/TMaxAnomaly_mblmModelStatistics.csv")
+#write_csv(monthly_TMax, "output_data/TMax_mblmModelStatistics.csv")
+#write_csv(monthly_TMax1975, "output_data/TMax_y1975.csv")
+
+```
+
+## Create Single CSV with all variables August model results and 1975 y intercept
+
+```{r}
+
+DO <- readr::read_csv("output_data/1975_y_intercept_DOVars_model_results.csv")
+TMax <- readr::read_csv("output_data/TMax_y1975.csv")
+Temp_other <- readr::read_csv("output_data/1975_y_intercept_TempVars_model_results.csv")
+
+names(Temp_other) -> colsTOKeep
+DO <- DO %>%
+  select(colsTOKeep)
+
+TMax <- TMax %>%
+  select(colsTOKeep)
+
+rbind(DO, TMax, Temp_other) %>% write_csv("output_data/1975_y_intercept_allVars.csv")
+
+rbind(DO, TMax, Temp_other) -> z
+z
+```
+
+## TMax and TMax Anomaly monthly trends across all 41 stations
+
+7/8/2024 " for a given year (I think we started with 2000 or 2001) and a given month (May-October only) I would like to know the average Tmax across all stations that were sampled in that month and year.  It would be helpful to also know the number of stations that were sampled in that month and year.  I would like to test for a relationship between air and water Temp anomalies to see how closely the reservoirs track changes in air temp."
+
+```{r}
+
+tmax_byMonthYear <- subset.df %>%
+  group_by(Year, MonthNum) %>%
+  summarize(Mean_TMax = mean(TMax, na.rm = TRUE),
+            Mean_TMaxAnom = mean(TAnomaly, na.rm = TRUE),
+            Nobs = n(),
+            .groups = 'drop') %>%
+  mutate(Month = month.name[MonthNum]) 
+
+write_csv(tmax_byMonthYear, "output_data/TMax_byMonthYear.csv")
+
+
+
+countPerGroup <- subset.df %>%
+  group_by(FDT_STA_ID, MonthNum) %>%
+  summarise(Nobs = n()) %>%
+  mutate(key = paste(FDT_STA_ID, MonthNum, sep="_"))
+
+insufficient_Nobs <- countPerGroup %>%
+  filter(Nobs < 10)
+
+```
