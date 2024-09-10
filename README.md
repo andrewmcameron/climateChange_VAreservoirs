@@ -1,7 +1,8 @@
 # Assessing the Effects of Climate Change in VA Reservoirs
 
 <p align="center">
-  <img src="img/varbymonth.jpg" width="750">
+  <img src="img/reservoirAnalysis_publicationPlot.jpg" width="400">
+  <img src="img/reservoirAnalysis_publicationPlot.jpg" width="400">
 </p>
 
 
