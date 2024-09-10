@@ -1,7 +1,7 @@
 # Assessing the Effects of Climate Change in VA Reservoirs
 
 <p align="center">
-  <img src="img/publication_images/reservoirAnalysis_publicationPlot.jpg" width="230">
+  <img src="img/publication_images/reservoirAnalysis_publicationPlot.jpg" width="233">
   <img src="img/publication_images/resevoirAnalysis_publicationMap.jpg" width="300">
 </p>
 
